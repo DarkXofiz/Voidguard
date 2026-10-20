@@ -1,0 +1,238 @@
+# =====================================================================
+#  VOIDGUARD AntiCheat - yapılandırma
+#  Varsayılanlar TEMKİNLİDİR: haksız ban riskini azaltmak önceliklidir.
+#  Hiçbir kontrol %100 doğruluk garantisi vermez.
+# =====================================================================
+
+# Genel açma/kapama
+enabled: true
+server-name: "VOIDGUARD Sunucusu"
+
+# --- Lag / ping toleransı: koşullar aşılırsa kontroller o oyuncu için atlanır ---
+tolerance:
+  min-tps: 17.5            # TPS bunun altındaysa tüm kontroller atlanır
+  max-ping: 450            # ping bunun üstündeyse o oyuncu için kontroller atlanır
+  lag-spike-ms: 1250       # 1 sn'lik görev bu kadar gecikirse 5 sn lag modu
+  teleport-grace-ms: 1500  # ışınlanma/dünya değişimi/giriş sonrası tolerans
+  velocity-grace-ms: 2000  # geri tepme/patlama sonrası tolerans
+  gamemode-grace-ms: 2000  # oyun modu veya uçuş izni değişimi sonrası tolerans
+  special-move-grace-ms: 1500  # elytra / riptide / araç / uçuş sonrası tolerans
+
+# --- İhlal puanı (VL) ve karar eşikleri ---
+violations:
+  decay-per-minute: 3.0        # her kontrol için dakikada azalan VL
+  alert-vl: 10.0               # bu VL'den sonra yetkililere uyarı
+  punish-vl: 40.0              # "güçlü kanıt" eşiği (kontrol başına)
+  min-distinct-checks: 2       # ceza için eşiği aşması gereken FARKLI kontrol sayısı
+  single-check-multiplier: 4.0 # tek kontrol için ceza eşiği = punish-vl x bu değer (görsel efekt çalışmaz)
+  alert-cooldown-ms: 3000
+  evidence-max: 6              # kontrol başına saklanan son kanıt sayısı
+
+# --- Ceza ---
+punishment:
+  enabled: true
+  dry-run: false               # true: ceza uygulanmaz, sadece yetkililere "cezalandırılacaktı" bildirilir
+  type: TEMPBAN                # KICK | TEMPBAN | BAN
+  duration: "1d"               # TEMPBAN süresi: 30m, 12h, 7d, 2w
+  reason: "VOIDGUARD: Doğrulanmış hile tespiti ({hile})"
+
+# --- Muafiyetler ---
+exempt:
+  ops: true
+  permission: "voidguard.bypass"
+  players: []                  # izinli test oyuncuları (isim listesi)
+
+# --- Uyarılar ---
+alerts:
+  console: true
+
+# --- Loglama ve veritabanı ---
+logging:
+  log-violations: true         # ihlalleri SQLite'a yaz
+  db-log-interval-ms: 3000     # aynı oyuncu+kontrol için en sık bu aralıkta kayıt
+  debug: false
+database:
+  file: "voidguard.db"
+  violation-retention-days: 30 # eski ihlal kayıtları otomatik silinir (0 = silme)
+
+# --- VOIDGUARD görsel ceza efekti ---
+# Yalnızca parçacık ve ses. Gerçek patlama, blok hasarı, envanter değişikliği YOKTUR.
+# Yalnızca "yüksek güven" (birden fazla bağımsız güçlü kanıt) doğrulandığında çalışır.
+effect:
+  enabled: true
+  duration-seconds: 4          # 1-10
+  tick-interval: 2             # 1-5 (büyük = daha az yük)
+  max-concurrent: 3            # aynı anda en fazla efekt
+  max-particles-per-tick: 80
+  min-tps: 17.0                # TPS bunun altındaysa efekt oynatılmaz, ceza doğrudan uygulanır
+  ring:
+    particle: DUST             # DUST = renkli; başka parçacık adı yazılırsa renk uygulanmaz
+    particles: 28              # halka başına (8-64)
+    min-radius: 0.8
+    max-radius: 3.0
+    cycles: 2.0                # süre boyunca kaç kez genişleyip daralsın
+    height-wave: 0.25
+    primary-color: "220,20,40"     # kırmızı (R,G,B)
+    secondary-color: "140,40,200"  # mor (R,G,B)
+    size: 1.4
+  freeze:
+    enabled: true              # yalnızca animasyon boyunca konumu sabitler; bitince/çıkışta kalkar
+  lift:
+    enabled: false             # VARSAYILAN KAPALI. Açılırsa oyuncu güvenli yüksekliğe kaldırılır ve sonda eski konumuna döner
+    height: 2.0                # en fazla 5; üstü boş değilse otomatik kısaltılır
+  fake-items:
+    enabled: false             # VARSAYILAN KAPALI. Yalnızca eşya PARÇACIĞI gösterir; gerçek envanter/eşya etkilenmez
+    count: 4
+  explosion:
+    particles: true            # TNT benzeri patlama parçacıkları (gerçek patlama YOK)
+    particle-count: 2
+    sound: true
+    fuse-sound: true
+    volume: 1.0
+    pitch: 1.0
+
+# --- Hile kontrolleri ---
+# weight: bu kontrolün VL katkı çarpanı. buffer: ceza öncesi gereken ardışık şüphe sayısı.
+checks:
+  killaura:
+    enabled: true
+    weight: 1.0
+    max-angle: 90
+    angle-buffer: 2
+    multi-window-ms: 300
+    multi-targets: 3
+    min-attacks-for-swing: 8
+    swing-mismatch: 5
+  reach:
+    enabled: true
+    weight: 1.0
+    base-reach: 3.1
+    per-ping-tick: 0.1
+    max-ping-leeway: 1.0
+    max-ping: 350
+    buffer: 3
+  fly:
+    enabled: true
+    weight: 1.0
+    hover-ticks: 10
+    height-tolerance: 0.6
+    gravity-tolerance: 0.05
+    buffer: 6
+  speed:
+    enabled: true
+    weight: 1.0
+    base-speed: 0.36
+    tolerance: 0.05
+    ice-multiplier: 1.6
+    buffer: 6
+  nofall:
+    enabled: true
+    weight: 1.0
+    min-fall-distance: 6.0
+    check-damage: true
+    buffer: 3
+  spider:
+    enabled: true
+    weight: 1.0
+    max-rise-ticks: 9
+    buffer: 4
+  jesus:
+    enabled: true
+    weight: 1.0
+    min-ticks: 10
+  autoclicker:
+    enabled: true
+    weight: 1.0
+    max-cps: 24
+    cps-buffer: 3
+    min-samples: 40
+    min-std-dev-ms: 10
+  scaffold:
+    enabled: true
+    weight: 1.0
+    max-places-per-second: 12
+    max-angle: 80
+    min-pitch: 25
+    buffer: 3
+    ray-check: true
+    ray-buffer: 6
+  antiknockback:
+    enabled: true
+    weight: 1.0
+    min-ratio: 0.2
+    min-velocity: 0.2
+    delay-ticks: 4
+    max-ping: 400
+    buffer: 3
+  fastbreak:
+    enabled: true
+    weight: 1.0
+    tolerance: 0.7
+    min-ticks: 3
+    buffer: 2
+    detect-no-start: false     # kazma başlatmadan kırma; VeinMiner gibi eklentilerle çakışabilir
+  inventory:
+    enabled: true
+    weight: 1.0
+    max-clicks-per-second: 30
+    move-grace-ms: 800
+    move-speed: 0.12
+    buffer: 4
+  packet:
+    enabled: true
+    weight: 1.0
+    max-moves-per-10s: 235
+    max-move-distance: 10.0
+    held-per-second: 50
+    drop-per-second: 25
+    interact-per-second: 40
+    sneak-per-second: 20
+
+# --- Mesajlar (renk kodu: &) ---
+messages:
+  prefix: "&8[&5VOID&cGUARD&8] "
+  no-permission: "&cBu komutu kullanma yetkiniz yok."
+  unknown-command: "&cBilinmeyen alt komut. &7/vg help"
+  usage: "&cKullanım: &f{kullanim}"
+  player-not-found: "&c{oyuncu} bulunamadı."
+  reloaded: "&aYapılandırma yeniden yüklendi."
+  alerts-on: "&aHile uyarıları &lAÇIK."
+  alerts-off: "&eHile uyarıları &lKAPALI."
+  unbanned: "&a{oyuncu} adlı oyuncunun banı kaldırıldı."
+  not-banned: "&c{oyuncu} için aktif ban bulunamadı."
+  alert: "&8[&5VG&8] &f{oyuncu} &7şüpheli: &e{hile} &7(VL &c{vl}&7, ping {ping}) &8{kanit}"
+  punished: "&c{oyuncu} &7cezalandırıldı: &e{hile} &8({tur})"
+  dry-run: "&e[Test modu] &f{oyuncu} &7cezalandırılacaktı: &e{hile}"
+  check-header: "&5&lVOIDGUARD &7| &f{oyuncu} &8(ping {ping} ms)"
+  check-none: "&7Kayıt yok."
+  info-header: "&5&lVOIDGUARD &7| Bilgi: &f{oyuncu}"
+  violations-header: "&5&lVOIDGUARD &7| Son ihlaller: &f{oyuncu}"
+  test-header: "&5&lVOIDGUARD &7| Tanılama"
+  test-effect-started: "&aEfekt önizlemesi başladı (ceza uygulanmaz)."
+  test-effect-disabled: "&eEfekt config'de kapalı (effect.enabled)."
+  test-effect-failed: "&cEfekt başlatılamadı (TPS düşük, eşzamanlı sınır veya zaten çalışıyor)."
+  help:
+    - "&5&lVOIDGUARD &7komutları:"
+    - "&d/vg check <oyuncu> &7- Anlık VL durumu"
+    - "&d/vg alerts &7- Uyarıları aç/kapat"
+    - "&d/vg info <oyuncu> &7- Oyuncu ve ban bilgisi"
+    - "&d/vg violations <oyuncu> &7- Kayıtlı ihlaller"
+    - "&d/vg unban <oyuncu> &7- Ban kaldır"
+    - "&d/vg reload &7- Yapılandırmayı yenile"
+    - "&d/vg test &7- Tanılama ve efekt önizlemesi"
+  ban-screen:
+    - "&5&lVOIDGUARD"
+    - ""
+    - "&c{sunucu} sunucusundan yasaklandınız."
+    - "&7Hile türü: &f{hile}"
+    - "&7Sebep: &f{sebep}"
+    - "&7Süre: &f{sure}"
+    - "&7Tarih: &f{tarih} &8| &7Kayıt: &f#{id}"
+    - ""
+    - "&7Haksız olduğunu düşünüyorsan yetkililere başvur."
+  kick-screen:
+    - "&5&lVOIDGUARD"
+    - ""
+    - "&c{sunucu} sunucusundan atıldınız."
+    - "&7Hile türü: &f{hile}"
+    - "&7Sebep: &f{sebep}"

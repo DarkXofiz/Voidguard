@@ -78,6 +78,15 @@ public final class VgCommand implements CommandExecutor, TabCompleter {
         s.sendMessage(plugin.msg("check-header", "{oyuncu}", t.getName(), "{ping}", String.valueOf(ServerUtil.ping(t))));
         s.sendMessage(plugin.color("&7Muaf: &f" + (plugin.exemptions().computeExempt(t) ? "Evet" : "Hayır")
                 + " &8| &7Mod: &f" + t.getGameMode() + " &8| &7TPS: &f" + ViolationManager.fmt(ServerUtil.tps())));
+        java.util.List<String> why = new java.util.ArrayList<>();
+        if (!plugin.getConfig().getBoolean("enabled", true)) why.add("eklenti kapalı (enabled: false)");
+        if (plugin.exemptions().computeExempt(t)) why.add("oyuncu muaf (OP / voidguard.bypass / exempt.players)");
+        String gate = plugin.gate().reason(t);
+        if (gate != null) why.add(gate);
+        if (plugin.effect().isActive(t.getUniqueId())) why.add("ceza animasyonu sürüyor");
+        s.sendMessage(plugin.color("&7Kontroller: " + (why.isEmpty() ? "&aAKTİF (bu oyuncu denetleniyor)" : "&cATLANIYOR: &f" + String.join(", ", why))));
+        s.sendMessage(plugin.color("&7Ceza: " + (!plugin.getConfig().getBoolean("punishment.enabled", true) ? "&ckapalı"
+                : plugin.getConfig().getBoolean("punishment.dry-run", false) ? "&eDRY-RUN (ban atılmaz!)" : "&aaçık")));
         Map<String, Double> snap = d.tracker.snapshot(now, plugin.violations().decayPerMinute());
         if (snap.isEmpty()) {
             s.sendMessage(plugin.msgRaw("check-none"));

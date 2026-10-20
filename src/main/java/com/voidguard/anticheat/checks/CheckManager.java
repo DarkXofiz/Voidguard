@@ -54,11 +54,24 @@ public final class CheckManager {
         return Collections.unmodifiableList(checks);
     }
 
+    private final java.util.Map<UUID, Long> skipLogged = new java.util.concurrent.ConcurrentHashMap<>();
+
     private boolean skip(Player p, PlayerData d) {
-        return !plugin.getConfig().getBoolean("enabled", true)
+        boolean skip = !plugin.getConfig().getBoolean("enabled", true)
                 || plugin.exemptions().isExempt(p, d)
                 || plugin.gate().skip(p)
                 || plugin.effect().isActive(p.getUniqueId());
+        if (skip && plugin.getConfig().getBoolean("logging.debug", false)) {
+            long now = System.currentTimeMillis();
+            Long last = skipLogged.get(p.getUniqueId());
+            if (last == null || now - last > 15_000) {
+                skipLogged.put(p.getUniqueId(), now);
+                String gate = plugin.gate().reason(p);
+                plugin.getLogger().info("[DEBUG] " + p.getName() + " denetlenmiyor: "
+                        + (plugin.exemptions().computeExempt(p) ? "muaf (OP/izin)" : gate != null ? gate : "efekt/diğer"));
+            }
+        }
+        return skip;
     }
 
     private void each(Action a) {

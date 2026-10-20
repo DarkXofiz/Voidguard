@@ -73,7 +73,19 @@ public final class VoidGuard extends JavaPlugin {
 
         gate.start();
         for (Player p : Bukkit.getOnlinePlayers()) dataManager.get(p); // /reload sonrası mevcut oyuncular
-        getLogger().info("VOIDGUARD " + getDescription().getVersion() + " etkin. Kontroller: " + checks.all().size());
+        getLogger().info("VOIDGUARD " + getDescription().getVersion() + " etkin. Kontroller: " + checks.all().size()
+                + " | Sunucu: " + Bukkit.getVersion());
+        getLogger().info("Durum: enabled=" + getConfig().getBoolean("enabled", true)
+                + ", ceza=" + getConfig().getBoolean("punishment.enabled", true)
+                + ", dry-run=" + getConfig().getBoolean("punishment.dry-run", false)
+                + ", OP muaf=" + getConfig().getBoolean("exempt.ops", true)
+                + ", min-tps=" + getConfig().getDouble("tolerance.min-tps", 17.5));
+        if (getConfig().getBoolean("punishment.dry-run", false)) {
+            getLogger().warning("punishment.dry-run AÇIK: hileciler BANLANMAZ, yalnızca bildirim gider.");
+        }
+        if (getConfig().getBoolean("exempt.ops", true)) {
+            getLogger().warning("exempt.ops AÇIK: OP olan hesaplar hiçbir kontrole takılmaz. Test için OP olmayan hesap kullanın.");
+        }
     }
 
     @Override

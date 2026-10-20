@@ -44,6 +44,16 @@ public final class PerformanceGate {
         return System.currentTimeMillis() < lagUntil;
     }
 
+    /** Kontrollerin neden atlandığını açıklar (teşhis için); atlanmıyorsa null. */
+    public String reason(Player p) {
+        double tps = ServerUtil.tps();
+        int ping = ServerUtil.ping(p);
+        if (lagging()) return "lag modu (sunucu gecikmesi algılandı)";
+        if (tps < minTps) return "TPS düşük (" + String.format(java.util.Locale.ROOT, "%.1f", tps) + " < " + minTps + ")";
+        if (ping > maxPing) return "ping yüksek (" + ping + " > " + maxPing + ")";
+        return null;
+    }
+
     public boolean skip(Player p) {
         return ExemptionPolicy.shouldSkipForLoad(ServerUtil.tps(), minTps, ServerUtil.ping(p), maxPing, lagging());
     }

@@ -1,52 +1,23 @@
 name: VoidGuard
-version: '${project.version}'
-main: com.voidguard.anticheat.VoidGuard
-api-version: '1.13'
-description: Sunucu tarafli, kanita dayali AntiCheat
-authors: [VOIDGUARD]
+version: '${version}'
+main: com.voidguard.anticheat.bukkit.VoidGuard
+api-version: '1.21'
+description: Düşük yanlış-pozitifli, kanıt tabanlı Paper AntiCheat
+authors: [VoidGuard]
+folia-supported: false
 commands:
-  voidguard:
-    aliases: [vg]
-    description: VOIDGUARD yonetim komutu
-    usage: /vg help
-    permission: voidguard.command
+  vg:
+    description: VoidGuard yönetim komutu
+    usage: /vg <help|alerts|status|history|exempt|reset|unban|reload>
+    aliases: [voidguard]
+    permission: voidguard.admin
 permissions:
-  voidguard.command:
-    description: /vg komutunu ve yardim ekranini kullanma
+  voidguard.admin:
+    description: Yönetim komutları
     default: op
   voidguard.alerts:
-    description: Hile uyarilarini alma ve /vg alerts
-    default: op
-  voidguard.check:
-    description: /vg check
-    default: op
-  voidguard.info:
-    description: /vg info
-    default: op
-  voidguard.violations:
-    description: /vg violations
-    default: op
-  voidguard.unban:
-    description: /vg unban
-    default: op
-  voidguard.reload:
-    description: /vg reload
-    default: op
-  voidguard.test:
-    description: /vg test
+    description: Hile uyarılarını görür
     default: op
   voidguard.bypass:
-    description: Tum hile kontrollerinden muaf olma
+    description: Tüm kontrollerden muaf
     default: false
-  voidguard.admin:
-    description: Tum VOIDGUARD yetkileri
-    default: op
-    children:
-      voidguard.command: true
-      voidguard.alerts: true
-      voidguard.check: true
-      voidguard.info: true
-      voidguard.violations: true
-      voidguard.unban: true
-      voidguard.reload: true
-      voidguard.test: true

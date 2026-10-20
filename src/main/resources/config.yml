@@ -1,259 +1,248 @@
-# =====================================================================
-#  VOIDGUARD AntiCheat - yapılandırma
-#  Varsayılanlar TEMKİNLİDİR: haksız ban riskini azaltmak önceliklidir.
-#  Hiçbir kontrol %100 doğruluk garantisi vermez.
-# =====================================================================
+# ===================================================================
+#  VoidGuard – yapılandırma
+#  Akış: kanıt -> log + (anında kısa engel) -> ihlal (1/3, 2/3) -> 3/3'te donma + yükselme sahnesi ve süreli ban.
+#  Yanlış pozitif görürseniz: /vg reset <oyuncu> ve ilgili kontrolün weight/eşiğini düşürün
+#  veya checks.<Ad>.enabled: false yapın. Banı tamamen kapatmak için sanctions.ban-enabled: false.
+# ===================================================================
 
-# Genel açma/kapama
-enabled: true
-server-name: "VOIDGUARD Sunucusu"
-
-# --- Lag / ping toleransı: koşullar aşılırsa kontroller o oyuncu için atlanır ---
-tolerance:
-  min-tps: 17.5            # TPS bunun altındaysa tüm kontroller atlanır
-  max-ping: 450            # ping bunun üstündeyse o oyuncu için kontroller atlanır
-  lag-spike-ms: 1250       # 1 sn'lik görev bu kadar gecikirse 5 sn lag modu
-  teleport-grace-ms: 1500  # ışınlanma/dünya değişimi/giriş sonrası tolerans
-  velocity-grace-ms: 2000  # geri tepme/patlama sonrası tolerans
-  gamemode-grace-ms: 2000  # oyun modu veya uçuş izni değişimi sonrası tolerans
-  special-move-grace-ms: 1500  # elytra / riptide / araç / uçuş sonrası tolerans
-
-# --- İhlal puanı (VL) ve karar eşikleri ---
-violations:
-  decay-per-minute: 3.0        # her kontrol için dakikada azalan VL
-  alert-vl: 10.0               # bu VL'den sonra yetkililere uyarı
-  punish-vl: 40.0              # "güçlü kanıt" eşiği (kontrol başına)
-  min-distinct-checks: 2       # ceza için eşiği aşması gereken FARKLI kontrol sayısı
-  single-check-multiplier: 4.0 # tek kontrol için ceza eşiği = punish-vl x bu değer (görsel efekt çalışmaz)
-  alert-cooldown-ms: 3000
-  evidence-max: 6              # kontrol başına saklanan son kanıt sayısı
-
-# --- Doğrulanmış tespit sayacı (3 tespit = ceza) ---
-# Bir kontrol buffer'ını aşıp şüphe bildirdiğinde "tespit" sayılır. Her sayılan tespit ANINDA loglanır ve
-# voidguard.alerts iznine sahip yetkililere bildirilir. Aynı oyuncu+kontrol için required kadar tespit
-# tamamlanır tamamlanmaz ceza uygulanır.
-detections:
-  required: 3                  # ceza için gereken tespit sayısı (kontrol başına)
-  min-interval-ms: 1500        # aynı olayın tekrarı sayılmaz: iki sayılan tespit arası en az bu kadar süre
-  window-seconds: 600          # bu süre boyunca yeni tespit gelmezse sayaç sıfırlanır (normal oyuncuyu korur)
-
-# --- Ceza ---
-punishment:
-  enabled: true
-  dry-run: false               # true: ceza uygulanmaz, sadece yetkililere "cezalandırılacaktı" bildirilir
-  type: TEMPBAN                # KICK | TEMPBAN | BAN
-  duration: "1d"               # TEMPBAN süresi: 30m, 12h, 7d, 2w
-  reason: "VOIDGUARD: Doğrulanmış hile tespiti ({hile})"
-
-# --- Muafiyetler ---
-exempt:
-  ops: true
-  permission: "voidguard.bypass"
-  players: []                  # izinli test oyuncuları (isim listesi)
-
-# --- Uyarılar ---
-alerts:
-  console: true
-
-# --- Loglama ve veritabanı ---
-logging:
-  log-violations: true         # ihlalleri SQLite'a yaz
-  db-log-interval-ms: 3000     # aynı oyuncu+kontrol için en sık bu aralıkta kayıt
+general:
   debug: false
-database:
-  file: "voidguard.db"
-  violation-retention-days: 30 # eski ihlal kayıtları otomatik silinir (0 = silme)
+  disabled-worlds: []            # kontrollerin kapalı olacağı dünyalar
+  bedrock-prefix: "."            # Geyser/Floodgate isim öneki ("" = kapalı)
+  bedrock-relaxed: true          # Bedrock oyuncularında Rotation/Aim/AutoClicker/Scaffold-ışın kapalı
+  bypass-permission: "voidguard.bypass"
 
-# --- VOIDGUARD görsel ceza efekti ---
-# Yalnızca parçacık ve ses. Gerçek patlama, blok hasarı, envanter değişikliği YOKTUR.
-# Yalnızca "yüksek güven" (birden fazla bağımsız güçlü kanıt) doğrulandığında çalışır.
-effect:
-  enabled: true
-  duration-seconds: 4          # 1-10
-  tick-interval: 2             # 1-5 (büyük = daha az yük)
-  max-concurrent: 3            # aynı anda en fazla efekt
-  max-particles-per-tick: 80
-  min-tps: 17.0                # TPS bunun altındaysa efekt oynatılmaz, ceza doğrudan uygulanır
-  ring:
-    particle: DUST             # DUST = renkli; başka parçacık adı yazılırsa renk uygulanmaz
-    particles: 28              # halka başına (8-64)
-    min-radius: 0.8
-    max-radius: 3.0
-    cycles: 2.0                # süre boyunca kaç kez genişleyip daralsın
-    height-wave: 0.25
-    primary-color: "220,20,40"     # kırmızı (R,G,B)
-    secondary-color: "140,40,200"  # mor (R,G,B)
-    size: 1.4
-  freeze:
-    enabled: true              # yalnızca animasyon boyunca konumu sabitler; bitince/çıkışta kalkar
-  lift:
-    enabled: false             # VARSAYILAN KAPALI. Açılırsa oyuncu güvenli yüksekliğe kaldırılır ve sonda eski konumuna döner
-    height: 2.0                # en fazla 5; üstü boş değilse otomatik kısaltılır
-  rise:
-    enabled: true              # yükselme hissi: oyuncu etrafında yukarı tırmanan parçacıklar (oyuncu hareket etmez)
-  wither-head:
-    enabled: true              # wither kafası görünümü: yalnızca parçacık (varlık/boss oluşturulmaz)
-  fake-items:
-    enabled: false             # VARSAYILAN KAPALI. Yalnızca eşya PARÇACIĞI gösterir; gerçek envanter/eşya etkilenmez
-    count: 4
-  explosion:
-    particles: true            # TNT benzeri patlama parçacıkları (gerçek patlama YOK)
-    particle-count: 2
-    sound: true
-    fuse-sound: true
-    volume: 1.0
-    pitch: 1.0
+# Lag / bağlantı güvenliği: bu koşullarda KANIT ÜRETİLMEZ.
+safety:
+  max-ping-ms: 400
+  min-tps: 18.0
+  join-grace-ticks: 100
+  teleport-grace-ticks: 30
+  respawn-grace-ticks: 60
+  flight-toggle-grace-ticks: 80
+  gamemode-grace-ticks: 40
+  glide-end-grace-ticks: 40
+  riptide-grace-ticks: 60
+  vehicle-exit-grace-ticks: 20
+  ping-jump-ms: 120              # iki saniye arasında ping bu kadar sıçrarsa kısa süre atla
+  ping-jump-grace-ticks: 60
 
-# --- Hile kontrolleri ---
-# weight: bu kontrolün VL katkı çarpanı. buffer: ceza öncesi gereken ardışık şüphe sayısı.
+# Şüphe puanı: her kanıt (weight x check-weight) puan ekler, zamanla azalır.
+suspicion:
+  decay-per-second: 0.15
+  alert-points-per-check: 4      # bir kontrolün puanı bunu aşınca staff'a bildir
+  alert-cooldown-seconds: 3
+
+# Staff / OP bildirimleri
+alerts:
+  notify-ops: true               # OP olan oyuncular (voidguard.alerts izni olmasa da) uyarı alır
+  ops-see-all-evidence: true     # OP'ler puan eşiğine bakılmadan HER kanıtı görür
+  notify-when-not-punished: true # ceza eşiği aşıldı ama oyuncu atılmadıysa (ceza kapalı) OP'lere bildir
+
+# ===== Kademeli müdahale =====
+# Her kontrol bağımsız puan toplar. Puan "confirm-points" üstüne çıkarsa bir İHLAL sayılır (en fazla dakikada bir,
+# kalıcı ve UUID bazlı). Düşük puan = yalnızca kayıt.
+#   1. ihlal -> geçici müdahale (örn. 15 sn saldırı/hareket engeli)      (1/3)
+#   2. ihlal -> daha uzun kısıtlama                                      (2/3)
+#   3. ihlal -> BAN, ama yalnızca: ban-uygun hile + HIGH kanıt + en az N bağımsız hile türü + ban kilidi açık (3/3)
+sanctions:
+  mitigation-enabled: true       # geçici, kendiliğinden biten müdahaleler
+  ban-enabled: true              # 3/3'te süreli ban (kapatmak için false)
+  ban-duration-days: 7           # ban süresi (gün). UUID bazlı, sunucu yeniden başlasa da sürer.
+  min-distinct-checks-for-ban: 1 # ban için kaç farklı hile türünde ihlal gerekir (1 = tek hile türü yeter)
+  save-interval-seconds: 300
+  # Log düştüğü ANDA devreye giren kısa engeller (ihlal sayacından bağımsız):
+  #   saldırı/blok/konteyner hileleri: işlem iptal edilir | hareket hileleri: geri alma + yerinde dondurma
+  instant:
+    enabled: true
+    min-points: 2                # kontrolün puanı bu değere ulaşınca (en az 2 kanıt) devreye girer
+    block-seconds: 3             # saldırı / blok koyma / konteyner engeli süresi
+    move-freeze-seconds: 2       # hareket dondurma süresi (yerinden oynayamaz, yukarı çıkamaz)
+  # Ban kararı verilince (3/3) oyuncu hemen atılmaz: yerinde DONAR (hareket edemez), etrafında kırmızı
+  # partikül çemberi döner, yukarı doğru HAVALANIR ve tepede ban ekranıyla atılır. Ban sahne başlamadan
+  # kaydedilir; sahne sırasında çıkan oyuncu yine banlıdır. Kapatırsanız oyuncu anında atılır.
+  void-sequence:
+    enabled: true
+    freeze-ticks: 30             # donma + halka oluşma süresi (20 tik = 1 sn)
+    rise-ticks: 50               # havalanma süresi
+    rise-height: 14.0            # yükselme yüksekliği (blok); üstte engel varsa orada kesilir
+    ring-radius: 1.4             # partikül çemberi yarıçapı
+  default:
+    confirm-points: 6            # ihlal sayılması için kontrol puanı (MEDIUM)
+    strong-points: 14            # güçlü kanıt (HIGH) – ban için gerekli
+    violations-to-restrict: 2
+    violations-to-ban: 3
+    expire-hours: 72             # ihlaller bu süre sonunda sayılmaz
+    violation-cooldown-seconds: 30
+    mitigation-seconds: 15
+    restrict-seconds: 30
+
+logging:
+  file: true                     # plugins/VoidGuard/logs/vg-YYYY-MM-DD.jsonl
+  console: false
+  console-min-total: 8
+  keep-days: 14
+  queue-size: 20000
+
+# Her kontrol: enabled, weight (kanıt başına puan çarpanı) + kontrol özel ayarlar.
 checks:
-  killaura:
+  Reach:
     enabled: true
     weight: 1.0
-    max-angle: 90
-    angle-buffer: 2
-    multi-window-ms: 300
+    tolerance: 0.30              # hedefin ping penceresindeki en yakın konumundan sonra eklenen pay
+    buffer: 6
+    mob-extra: 0.30
+    cancel-margin: 0.50          # bu kadar açık aşımda vuruş anında iptal edilir
+    mitigation: ATTACK
+    ban-eligible: true
+    instant: true
+  Aim:                           # bakış ışını hedefi ıskalıyor (rotasyonsuz Aura, HitBox)
+    enabled: true
+    weight: 1.0
+    expand: 0.15
+    buffer: 7
+    mitigation: ATTACK
+    ban-eligible: true
+    instant: true
+  Aura:                          # çoklu hedef, snap, duvar arkası
+    enabled: true
+    weight: 1.0
     multi-targets: 3
-    min-attacks-for-swing: 8
-    swing-mismatch: 5
-  reach:
+    multi-ticks: 5
+    flick-degrees: 60
+    wall-check: true             # HER vuruşta duvar kontrolü; kapalıysa vuruş anında iptal edilir
+    angle-cancel-degrees: 70     # bakış hedeften bu kadar saparsa vuruş anında iptal
+    mitigation: ATTACK
+    ban-eligible: true
+    instant: true
+  AutoClicker:
     enabled: true
     weight: 1.0
-    base-reach: 3.1
-    per-ping-tick: 0.1
-    max-ping-leeway: 1.0
-    max-ping: 350
+    max-cps: 22
+    sustain-seconds: 3
+    consistency-samples: 40
+    consistency-min-stddev: 0.35
+    mitigation: ATTACK
+    ban-eligible: false
+    instant: false
+  Velocity:                      # Anti-Knockback
+    enabled: true
+    weight: 1.0
+    min-ratio: 1.2               # vanilla en kötü durumda ≈4.7 ölçüldü
     buffer: 3
-  fly:
+    mitigation: NONE
+    ban-eligible: false
+    instant: false
+  Fly:                           # Fly, Hover, FastFall
     enabled: true
     weight: 1.0
-    hover-ticks: 10
-    height-tolerance: 0.6
-    gravity-tolerance: 0.05
-    buffer: 6
-  speed:
+    hover-ticks: 8
+    max-rise: 1.32
+    mitigation: MOVE
+    ban-eligible: true
+    instant: true
+  Step:
     enabled: true
     weight: 1.0
-    base-speed: 0.36
-    tolerance: 0.05
-    ice-multiplier: 1.6
-    buffer: 6
-  nofall:
+    mitigation: MOVE
+    ban-eligible: true
+    instant: true
+  HighJump:
     enabled: true
     weight: 1.0
-    min-fall-distance: 6.0
-    check-damage: true
-    buffer: 3
-  spider:
+    mitigation: MOVE
+    ban-eligible: true
+    instant: true
+  Speed:
     enabled: true
     weight: 1.0
-    max-rise-ticks: 9
-    buffer: 4
-  jesus:
+    margin: 0.10                 # vanilla (sprint+bhop) limitlerinin üstüne tolerans
+    ice-multiplier: 2.2
+    mitigation: MOVE
+    ban-eligible: true
+    instant: true
+  Timer:                         # Timer / TickShift / paket patlaması
     enabled: true
     weight: 1.0
-    min-ticks: 10
-  autoclicker:
+    max-credit-ms: 800
+    tolerance-ms: 100
+    mitigation: MOVE
+    ban-eligible: true
+    instant: false
+  NoFall:
     enabled: true
     weight: 1.0
-    max-cps: 24
-    cps-buffer: 3
-    min-samples: 40
-    min-std-dev-ms: 10
-  scaffold:
+    mitigation: MOVE
+    ban-eligible: true
+    instant: true
+  NoSlow:
     enabled: true
     weight: 1.0
-    max-places-per-second: 12
-    max-angle: 80
-    min-pitch: 25
-    buffer: 3
-    ray-check: true
-    ray-buffer: 6
-  antiknockback:
+    limit: 0.12
+    mitigation: MOVE
+    ban-eligible: true
+    instant: true
+  Scaffold:
     enabled: true
     weight: 1.0
-    min-ratio: 0.2
-    min-velocity: 0.2
-    delay-ticks: 4
-    max-ping: 400
-    buffer: 3
-  fastbreak:
+    rate-per-20-ticks: 14
+    mitigation: PLACE
+    ban-eligible: true
+    instant: true
+  Criticals:
     enabled: true
     weight: 1.0
-    tolerance: 0.7
-    min-ticks: 3
-    buffer: 2
-    detect-no-start: false     # kazma başlatmadan kırma; VeinMiner gibi eklentilerle çakışabilir
-  inventory:
+    mitigation: ATTACK
+    ban-eligible: false
+    instant: false
+  ChestStealer:
     enabled: true
     weight: 1.0
-    max-clicks-per-second: 30
-    move-grace-ms: 800
-    move-speed: 0.12
-    buffer: 4
-  packet:
+    min-open-ticks: 3
+    samples: 12
+    min-stddev: 0.3
+    mitigation: CONTAINER
+    ban-eligible: false
+    instant: false
+  GuiMove:
     enabled: true
     weight: 1.0
-    max-moves-per-10s: 235
-    max-move-distance: 10.0
-    held-per-second: 50
-    drop-per-second: 25
-    interact-per-second: 40
-    sneak-per-second: 20
-
-# --- Mesajlar (renk kodu: &) ---
-messages:
-  prefix: "&8[&5VOID&cGUARD&8] "
-  no-permission: "&cBu komutu kullanma yetkiniz yok."
-  unknown-command: "&cBilinmeyen alt komut. &7/vg help"
-  usage: "&cKullanım: &f{kullanim}"
-  player-not-found: "&c{oyuncu} bulunamadı."
-  reloaded: "&aYapılandırma yeniden yüklendi."
-  alerts-on: "&aHile uyarıları &lAÇIK."
-  alerts-off: "&eHile uyarıları &lKAPALI."
-  unbanned: "&a{oyuncu} adlı oyuncunun banı kaldırıldı."
-  not-banned: "&c{oyuncu} için aktif ban bulunamadı."
-  alert: "&8[&5VG&8] &f{oyuncu} &7şüpheli: &e{hile} &7(VL &c{vl}&7, ping {ping}) &8{kanit}"
-  punished: "&c{oyuncu} &7cezalandırıldı: &e{hile} &8({tur})"
-  ban-failed: "&4&lHATA &c{oyuncu} için ceza tam uygulanamadı: &7{sebep} &8(konsolu kontrol edin)"
-  detection:
-    - "&5[VOIDGUARD] &c&lHİLE TESPİT EDİLDİ!"
-    - "&7Oyuncu: &f{oyuncu}"
-    - "&7Hile türü: &e{hile}"
-    - "&7Tespit sayısı: &c{sayi}/{gerekli}"
-    - "&7İhlal seviyesi: &c{vl}"
-    - "&7Kanıt: &f{kanit}"
-  dry-run: "&e[Test modu] &f{oyuncu} &7cezalandırılacaktı: &e{hile}"
-  check-header: "&5&lVOIDGUARD &7| &f{oyuncu} &8(ping {ping} ms)"
-  check-none: "&7Kayıt yok."
-  info-header: "&5&lVOIDGUARD &7| Bilgi: &f{oyuncu}"
-  violations-header: "&5&lVOIDGUARD &7| Son ihlaller: &f{oyuncu}"
-  test-header: "&5&lVOIDGUARD &7| Tanılama"
-  test-effect-started: "&aEfekt önizlemesi başladı (ceza uygulanmaz)."
-  test-effect-disabled: "&eEfekt config'de kapalı (effect.enabled)."
-  test-effect-failed: "&cEfekt başlatılamadı (TPS düşük, eşzamanlı sınır veya zaten çalışıyor)."
-  help:
-    - "&5&lVOIDGUARD &7komutları:"
-    - "&d/vg check <oyuncu> &7- Anlık VL durumu"
-    - "&d/vg alerts &7- Uyarıları aç/kapat"
-    - "&d/vg info <oyuncu> &7- Oyuncu ve ban bilgisi"
-    - "&d/vg violations <oyuncu> &7- Kayıtlı ihlaller"
-    - "&d/vg unban <oyuncu> &7- Ban kaldır"
-    - "&d/vg reload &7- Yapılandırmayı yenile"
-    - "&d/vg test &7- Tanılama ve efekt önizlemesi"
-  ban-screen:
-    - "&5&lVOIDGUARD"
-    - ""
-    - "&c{sunucu} sunucusundan yasaklandınız."
-    - "&7Hile türü: &f{hile}"
-    - "&7Sebep: &f{sebep}"
-    - "&7Süre: &f{sure}"
-    - "&7Tarih: &f{tarih} &8| &7Kayıt: &f#{id}"
-    - ""
-    - "&7Haksız olduğunu düşünüyorsan yetkililere başvur."
-  kick-screen:
-    - "&5&lVOIDGUARD"
-    - ""
-    - "&c{sunucu} sunucusundan atıldınız."
-    - "&7Hile türü: &f{hile}"
-    - "&7Sebep: &f{sebep}"
+    mitigation: MOVE
+    ban-eligible: false
+    instant: false
+  Rotation:                      # fare kuantizasyonu (GCD); sinematik kamera/özel istemcilerde yanlış pozitif olabilir
+    enabled: true
+    weight: 0.4
+    window: 40
+    min-step: 0.005
+    mitigation: NONE
+    ban-eligible: false
+    instant: false
+  Phase:
+    enabled: true
+    weight: 0.6
+    mitigation: MOVE
+    ban-eligible: true
+    instant: true
+  Jesus:                         # sıvı yüzeyinde yürüme
+    enabled: true
+    weight: 1.0
+    ticks: 12
+    mitigation: MOVE
+    ban-eligible: true
+    instant: true
+  Spider:                        # duvara tırmanma (Fly sapması duvar yanındaysa)
+    enabled: true
+    weight: 1.0
+    mitigation: MOVE
+    ban-eligible: true
+    instant: true
+  AimAssist:                     # nişan her vuruşta hedef merkezine fazla kilitli
+    enabled: true
+    weight: 0.7
+    samples: 25
+    max-mean: 1.2
+    max-stddev: 0.7
+    mitigation: ATTACK
+    ban-eligible: false
+    instant: false

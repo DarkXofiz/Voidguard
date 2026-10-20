@@ -1,8 +1,5 @@
-target/
-*.db
-*.db-wal
-*.db-shm
+build/
+.gradle/
+*.class
 .idea/
-*.iml
-.vscode/
-.DS_Store
+out/

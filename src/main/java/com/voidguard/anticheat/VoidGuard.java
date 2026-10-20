@@ -115,6 +115,15 @@ public final class VoidGuard extends JavaPlugin {
         return color(replace(getConfig().getString("messages." + key, "&cEksik mesaj: " + key), kv));
     }
 
+    /** Çok satırlı mesaj (config listesi). Önce renk kodları çevrilir, sonra değerler eklenir (kanıt metni renklendirilemez). */
+    public java.util.List<String> msgLines(String key, String... kv) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        java.util.List<String> raw = getConfig().getStringList("messages." + key);
+        if (raw.isEmpty()) raw = java.util.Collections.singletonList("&cEksik mesaj: " + key);
+        for (String line : raw) out.add(replace(color(line), kv));
+        return out;
+    }
+
     /** Önekli mesaj. */
     public String msg(String key, String... kv) {
         return color(getConfig().getString("messages.prefix", "&8[&5VOID&cGUARD&8] ")) + msgRaw(key, kv);

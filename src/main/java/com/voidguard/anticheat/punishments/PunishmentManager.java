@@ -57,6 +57,7 @@ public final class PunishmentManager {
                 }
             }
             d.tracker.clear();
+            plugin.violations().resetDetections(id);
             return;
         }
         if (!punishing.add(id)) return;
@@ -65,43 +66,97 @@ public final class PunishmentManager {
         Runnable apply = () -> apply(id, name, check, summary);
         boolean played = false;
         if (dec.highConfidence() && p.isOnline() && plugin.effect().isEnabled()) {
-            played = plugin.effect().play(p, false, apply);
+            try {
+                played = plugin.effect().play(p, false, apply);
+            } catch (Throwable t) {
+                // Animasyon başlatılamadı: ceza yine de gecikmeden uygulanır.
+                plugin.getLogger().log(Level.WARNING, "Ceza animasyonu başlatılamadı, ban doğrudan uygulanıyor", t);
+                plugin.effect().finishQuietly(id);
+                played = false;
+            }
         }
         if (!played) apply.run();
     }
 
-    @SuppressWarnings("deprecation")
+    /** Ceza her zaman ana iş parçacığında uygulanır (kick/Bukkit API). Başarısızlık loglanır ve yetkililere bildirilir. */
     private void apply(UUID id, String name, String check, String summary) {
+        if (!Bukkit.isPrimaryThread()) {
+            try {
+                Bukkit.getScheduler().runTask(plugin, () -> apply(id, name, check, summary));
+                return;
+            } catch (Throwable t) {
+                plugin.getLogger().log(Level.SEVERE, "Ceza ana iş parçacığına aktarılamadı", t);
+                punishing.remove(id);
+                return;
+            }
+        }
+        applyNow(id, name, check, summary);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void applyNow(UUID id, String name, String check, String summary) {
+        BanRecord rec = null;
         try {
             FileConfiguration c = plugin.getConfig();
             String type = c.getString("punishment.type", "TEMPBAN").toUpperCase(Locale.ROOT);
             String reason = c.getString("punishment.reason", "VOIDGUARD: Doğrulanmış hile tespiti ({hile})")
                     .replace("{hile}", check);
             long now = System.currentTimeMillis();
-            BanRecord rec;
             if (type.equals("KICK")) {
                 rec = new BanRecord(0, id, name, reason, check, summary, "KICK", "VOIDGUARD", now, now, false);
-                plugin.db().insertBan(rec);
+                final BanRecord kickRec = rec;
+                plugin.db().insertBan(rec).whenComplete((newId, err) -> {
+                    if (err != null) reportFailure(name, "Kick kaydı veritabanına yazılamadı", err);
+                    else kickRec.id = newId;
+                });
             } else {
                 long dur = type.equals("BAN") ? 0 : TimeUtil.parseDuration(c.getString("punishment.duration", "1d"));
                 if (dur < 0) dur = TimeUtil.parseDuration("1d");
-                rec = ban(id, name, reason, check, summary, dur, "VOIDGUARD");
+                rec = ban(id, name, reason, check, summary, dur, "VOIDGUARD"); // önbelleğe anında yazılır
             }
             PlayerData d = plugin.data().getIfPresent(id);
             if (d != null) d.tracker.clear();
+            plugin.violations().resetDetections(id);
 
             Player pl = Bukkit.getPlayer(id);
             if (pl != null && pl.isOnline()) pl.kickPlayer(banScreen(rec));
 
             String line = plugin.msg("punished", "{oyuncu}", name, "{hile}", check, "{tur}", rec.type);
-            for (Player staff : Bukkit.getOnlinePlayers()) {
-                if (staff.hasPermission("voidguard.alerts")) staff.sendMessage(line);
-            }
+            notifyStaff(line);
             plugin.getLogger().info("CEZA: " + name + " (" + id + ") " + rec.type + " | " + check + " | " + summary);
         } catch (Throwable t) {
-            plugin.getLogger().log(Level.SEVERE, "Ceza uygulanırken hata", t);
+            reportFailure(name, "Ceza uygulanamadı", t);
+            // Son çare: ban kaydı oluşmuş olabilir ama kick atılamamış olabilir; oyuncuyu yine de düşürmeyi dene.
+            try {
+                Player pl = Bukkit.getPlayer(id);
+                if (pl != null && pl.isOnline()) pl.kickPlayer(plugin.color("&cVOIDGUARD: hile tespiti"));
+            } catch (Throwable t2) {
+                plugin.getLogger().log(Level.SEVERE, "Oyuncu atılamadı: " + name, t2);
+            }
         } finally {
             punishing.remove(id);
+        }
+    }
+
+    /** Hatayı sessizce yutmaz: konsola SEVERE yazar ve voidguard.alerts iznine sahip yetkililere bildirir. */
+    private void reportFailure(String name, String what, Throwable t) {
+        plugin.getLogger().log(Level.SEVERE, what + " (" + name + ")", t);
+        String reason = t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
+        notifyStaff(plugin.msg("ban-failed", "{oyuncu}", name, "{sebep}", what + ": " + reason));
+    }
+
+    /** voidguard.alerts iznine sahip çevrimiçi yetkililere mesaj (her iş parçacığından güvenli). */
+    private void notifyStaff(String line) {
+        if (!Bukkit.isPrimaryThread()) {
+            try {
+                Bukkit.getScheduler().runTask(plugin, () -> notifyStaff(line));
+            } catch (Throwable ignored) {
+                // eklenti kapanırken zamanlayıcı kullanılamaz; konsol kaydı zaten yazıldı
+            }
+            return;
+        }
+        for (Player staff : Bukkit.getOnlinePlayers()) {
+            if (staff.hasPermission("voidguard.alerts") || staff.hasPermission("voidguard.admin")) staff.sendMessage(line);
         }
     }
 
@@ -111,7 +166,10 @@ public final class PunishmentManager {
         BanRecord rec = new BanRecord(0, id, name, reason, check, evidence, perm ? "BAN" : "TEMPBAN", by, now,
                 perm ? 0 : now + durationMs, true);
         activeBans.put(id, rec);
-        plugin.db().insertBan(rec).thenAccept(newId -> rec.id = newId);
+        plugin.db().insertBan(rec).whenComplete((newId, err) -> {
+            if (err != null) reportFailure(name, "Ban kaydı veritabanına yazılamadı (ban bellekte geçerli, yeniden başlatmada kaybolabilir)", err);
+            else rec.id = newId;
+        });
         return rec;
     }
 
@@ -152,7 +210,7 @@ public final class PunishmentManager {
         text = text.replace("{sunucu}", plugin.getConfig().getString("server-name", "Sunucu"))
                 .replace("{hile}", b.checkName == null ? "-" : b.checkName)
                 .replace("{sebep}", b.reason == null ? "-" : b.reason)
-                .replace("{sure}", dur).replace("{tarih}", date).replace("{id}", String.valueOf(b.id));
+                .replace("{sure}", dur).replace("{tarih}", date).replace("{id}", b.id > 0 ? String.valueOf(b.id) : "-");
         return plugin.color(text);
     }
 }

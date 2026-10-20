@@ -76,16 +76,21 @@ com.voidguard.anticheat
 
 ## Karar ve ceza sistemi
 
-Her oyuncu için her kontrolün ayrı **VL**'si tutulur ve zamanla azalır (`violations.decay-per-minute`).
+Her oyuncu için her kontrolün ayrı **VL**'si tutulur (zamanla azalır, `violations.decay-per-minute`) ve ayrıca
+**doğrulanmış tespit sayacı** çalışır:
 
-1. **Düşük şüphe** (VL < `alert-vl`): yalnızca kayıt (SQLite `violations` tablosu).
-2. **Orta** (VL ≥ `alert-vl`): `voidguard.alerts` iznine sahip yetkililere ve konsola uyarı.
-3. **Yüksek**: ceza yalnızca şu durumlarda uygulanır:
-   * **En az `min-distinct-checks` (varsayılan 2) FARKLI kontrol** `punish-vl` eşiğini aşarsa → *yüksek güven*; veya
-   * Tek bir kontrol `punish-vl × single-check-multiplier` (varsayılan 40×4=160) değerini aşarsa → ceza var, **görsel efekt yok**.
-4. Ban öncesinde tetiklenen kontroller, VL'ler ve son kanıtlar `bans` tablosuna kaydedilir (UUID, tarih, kontrol, kanıt özeti).
-5. Ceza türü: `KICK`, `TEMPBAN` (varsayılan, `1d`) veya `BAN`. `/vg unban` ile kaldırılır; aktif banlar yeniden başlatmada SQLite'tan geri yüklenir.
-6. Ceza animasyonu sırasında oyuncu çıkarsa ceza **yine uygulanır** (ban kaçışı engellenir).
+1. Bir kontrol kendi `buffer` eşiğini aşıp şüphe bildirdiğinde bu bir **tespit** sayılır.
+2. Her sayılan tespit **anında**: konsola yazılır, SQLite `violations` tablosuna kaydedilir (oyuncu, UUID, kontrol, VL, kanıt,
+   tarih; kanıtın başında `[sayı/3]`) ve `voidguard.alerts` iznine sahip çevrimiçi yetkililere şu biçimde gönderilir
+   (`messages.detection`): *HİLE TESPİT EDİLDİ! / Oyuncu / Hile türü / Tespit sayısı n/3 / İhlal seviyesi / Kanıt*.
+3. Aynı oyuncunun **aynı kontrolü** için `detections.required` (varsayılan **3**) tespit tamamlanır tamamlanmaz ceza uygulanır;
+   bekleme/zamanlayıcı yoktur (animasyon açıksa yalnızca `effect.duration-seconds`, sonunda ban gecikmeden gelir).
+4. Aynı olayın tekrarı sayılmaz (`detections.min-interval-ms`); `detections.window-seconds` boyunca yeni tespit gelmezse sayaç
+   sıfırlanır. Sayaç oyuncu çıkınca silinmez (çıkıp girerek sıfırlanamaz).
+5. Ban kaydına tetikleyen kontrol, VL'ler ve son kanıtlar yazılır. Ceza türü: `KICK`, `TEMPBAN` (varsayılan, `1d`) veya `BAN`.
+   `/vg unban` ile kaldırılır; aktif banlar yeniden başlatmada SQLite'tan geri yüklenir.
+6. Ban/DB hatası **sessizce yutulmaz**: konsola SEVERE yazılır ve yetkililere `ban-failed` mesajı gider.
+7. Ceza animasyonu sırasında oyuncu çıkarsa/ölürse/dünya değiştirirse görev iptal edilir ve ceza **yine uygulanır**.
 
 Yanlış pozitifleri azaltmak için: ardışık ihlal tamponu (`buffer`), TPS/lag/ping kapısı, ışınlanma/geri tepme/oyun modu/uçuş
 izni değişimi sonrası tolerans, elytra/riptide/araç muafiyeti, OP/izin/isim muafiyeti.
@@ -110,9 +115,10 @@ izni değişimi sonrası tolerans, elytra/riptide/araç muafiyeti, OP/izin/isim 
 
 ## VOIDGUARD görsel ceza efekti
 
-Yalnızca **yüksek güven** kararından sonra, `effect.enabled: true` iken çalışır:
+Doğrulanmış (3 tespit) cezadan önce, `effect.enabled: true` iken çalışır:
 
 * Oyuncunun çevresinde **kırmızı ve mor** parçacıklardan halka; süre boyunca genişleyip daralır ve döner.
+* **Yükselme hissi** (`effect.rise`) ve **wither kafası görünümü** (`effect.wither-head`): yalnızca parçacık, oyuncu gerçekte yükselmez, varlık oluşturulmaz.
 * Oyuncu animasyon boyunca **sabitlenir** (hareket olayı ile; bakış serbest). Bitince, çıkışta veya eklenti kapanırken otomatik kalkar.
 * **Yukarı kaldırma** (`effect.lift.enabled`) **varsayılan kapalı**; açılırsa üstü boş değilse kısaltılır ve bitişte oyuncu eski konumuna geri ışınlanır.
 * **Sahte eşya** (`effect.fake-items.enabled`) **varsayılan kapalı**; yalnızca eşya *parçacığı* gösterir, envantere dokunmaz.
@@ -132,7 +138,7 @@ Yalnızca **yüksek güven** kararından sonra, `effect.enabled: true` iken çal
 `mvn test` — Bukkit gerektirmeyen birim testleri: normal sprint-zıplama, hız hilesi, SPEED efekti/buz, lag ölçeklemesi,
 yüksek ping reach toleransı, zıplama yüksekliği/yerçekimi, geri tepme (yok sayma/ping gecikmesi), blok kırma alt sınırı,
 elytra / izinli uçuş / ışınlanma / geri tepme / yaratıcı / araç muafiyetleri, TPS ve ping kapısı, tıklama analizi,
-VL azalması, karar mantığı (uyarı/ceza/yüksek güven), süre ayrıştırma.
+VL azalması, karar mantığı, **3 tespit sayacı** (`DetectionLedgerTest`), süre ayrıştırma.
 
 Bukkit'e bağlı sınıflar (kontroller, dinleyiciler, efekt) bir sunucu olmadan birim testlenemez; bunlar için
 bir test sunucusunda `punishment.dry-run: true` ve `logging.debug: true` ile saha testi yapın.

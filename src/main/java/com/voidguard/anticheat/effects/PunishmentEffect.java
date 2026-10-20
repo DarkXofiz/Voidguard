@@ -90,7 +90,16 @@ public final class PunishmentEffect {
             s.liftMax = safeLift(s.origin, Math.min(5.0, c.getDouble("effect.lift.height", 2.0)));
         }
         sessions.put(id, s);
+        try {
+            return start(p, s, id, c);
+        } catch (Throwable t) {
+            plugin.getLogger().log(Level.WARNING, "Efekt başlatılamadı, ceza doğrudan uygulanacak", t);
+            finishQuietly(id);
+            return false;
+        }
+    }
 
+    private boolean start(Player p, Session s, UUID id, FileConfiguration c) {
         if (c.getBoolean("effect.explosion.fuse-sound", true) && c.getBoolean("effect.explosion.sound", true)) {
             p.getWorld().playSound(p.getLocation(), "entity.tnt.primed", 1.0f, 1.0f);
         }
@@ -105,8 +114,8 @@ public final class PunishmentEffect {
             @Override
             public void run() {
                 Player pl = Bukkit.getPlayer(id);
-                if (pl == null || !pl.isOnline() || pl.isDead()) {
-                    finish(id);
+                if (pl == null || !pl.isOnline() || pl.isDead() || !pl.getWorld().equals(s.origin.getWorld())) {
+                    finish(id); // çıkış / ölüm / dünya değişimi: görev iptal, ceza gecikmeden uygulanır
                     return;
                 }
                 try {
@@ -134,12 +143,16 @@ public final class PunishmentEffect {
     public void finish(UUID id) {
         Session s = sessions.remove(id);
         if (s == null) return;
-        if (s.task != null) s.task.cancel();
-        Player p = Bukkit.getPlayer(id);
-        if (p != null && p.isOnline() && s.liftApplied && s.origin.getWorld() != null) {
-            p.teleport(s.origin, PlayerTeleportEvent.TeleportCause.PLUGIN);
-            p.setFallDistance(0f);
-            p.setVelocity(new Vector(0, 0, 0));
+        try {
+            if (s.task != null) s.task.cancel();
+            Player p = Bukkit.getPlayer(id);
+            if (p != null && p.isOnline() && s.liftApplied && s.origin.getWorld() != null) {
+                p.teleport(s.origin, PlayerTeleportEvent.TeleportCause.PLUGIN);
+                p.setFallDistance(0f);
+                p.setVelocity(new Vector(0, 0, 0));
+            }
+        } catch (Throwable t) {
+            plugin.getLogger().log(Level.WARNING, "Efekt temizliği hatası (ceza yine uygulanacak)", t);
         }
         if (s.onFinish != null) {
             try {
@@ -147,6 +160,17 @@ public final class PunishmentEffect {
             } catch (Throwable t) {
                 plugin.getLogger().log(Level.SEVERE, "Efekt sonrası ceza hatası", t);
             }
+        }
+    }
+
+    /** Oturumu ceza çalıştırmadan kapatır (çağıran cezayı kendisi uygular). */
+    public void finishQuietly(UUID id) {
+        Session s = sessions.remove(id);
+        if (s == null) return;
+        try {
+            if (s.task != null) s.task.cancel();
+        } catch (Throwable t) {
+            plugin.getLogger().log(Level.WARNING, "Efekt görevi iptal edilemedi", t);
         }
     }
 
@@ -216,8 +240,53 @@ public final class PunishmentEffect {
             }
         }
 
+        boolean lowTps = ServerUtil.tps() < c.getDouble("effect.min-tps", 17.0) + 1.0;
+        int left = budget - n;
+        if (!lowTps && left >= 6 && colored) {
+            if (c.getBoolean("effect.rise.enabled", true)) {
+                riseColumn(w, center, step, progress, Math.min(10, left / 3), red, purple);
+            }
+            if (c.getBoolean("effect.wither-head.enabled", true)) {
+                witherHead(w, center, step, progress, Math.min(6, Math.max(0, (left - Math.min(10, left / 3)) / 4)));
+            }
+        }
+
         if (c.getBoolean("effect.fake-items.enabled", false) && itemParticle != null && step % 2 == 0) {
             spawnFakeItems(p, w, center, Math.max(1, Math.min(8, c.getInt("effect.fake-items.count", 4))));
+        }
+    }
+
+    /** Yukarı yükselme hissi: oyuncunun etrafında yukarı doğru tırmanan parçacık spirali (oyuncu gerçekte hareket etmez). */
+    private void riseColumn(World w, Location center, int step, double progress, int count, Particle.DustOptions red, Particle.DustOptions purple) {
+        double height = 0.3 + 2.4 * progress;
+        for (int i = 0; i < count; i++) {
+            double t = (double) i / Math.max(1, count);
+            double a = step * 0.6 + t * 2 * Math.PI * 2;
+            double y = center.getY() + (height * ((t + progress * 2) % 1.0));
+            double rr = 0.6 + 0.2 * Math.sin(a * 2);
+            w.spawnParticle(dust, center.getX() + rr * Math.cos(a), y, center.getZ() + rr * Math.sin(a), 1, 0, 0, 0, 0, (i % 2 == 0) ? purple : red);
+        }
+    }
+
+    /** Wither kafası görünümü (yalnızca parçacık): oyuncunun üstünde üç koyu "kafa" ve kırmızı gözler. */
+    private void witherHead(World w, Location center, int step, double progress, int perHead) {
+        if (perHead <= 0) return;
+        Particle.DustOptions dark = new Particle.DustOptions(Color.fromRGB(35, 35, 40), 1.2f);
+        Particle.DustOptions eye = new Particle.DustOptions(Color.fromRGB(255, 30, 30), 0.9f);
+        double baseY = center.getY() + 2.2 + 0.8 * progress;
+        double spin = step * 0.15;
+        double[] offs = {0.0, -0.75, 0.75};
+        for (int h = 0; h < offs.length; h++) {
+            double sc = h == 0 ? 1.0 : 0.75;
+            double cx = center.getX() + offs[h] * Math.cos(spin);
+            double cz = center.getZ() + offs[h] * Math.sin(spin);
+            double cy = baseY - (h == 0 ? 0 : 0.2);
+            for (int i = 0; i < perHead; i++) {
+                double a = (2 * Math.PI * i) / perHead + spin;
+                w.spawnParticle(dust, cx + 0.22 * sc * Math.cos(a), cy + 0.22 * sc * Math.sin(a * 2) , cz + 0.22 * sc * Math.sin(a), 1, 0, 0, 0, 0, dark);
+            }
+            w.spawnParticle(dust, cx - 0.08 * sc, cy + 0.05, cz, 1, 0, 0, 0, 0, eye);
+            w.spawnParticle(dust, cx + 0.08 * sc, cy + 0.05, cz, 1, 0, 0, 0, 0, eye);
         }
     }
 

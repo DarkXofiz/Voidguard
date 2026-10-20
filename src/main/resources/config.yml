@@ -28,6 +28,15 @@ violations:
   alert-cooldown-ms: 3000
   evidence-max: 6              # kontrol başına saklanan son kanıt sayısı
 
+# --- Doğrulanmış tespit sayacı (3 tespit = ceza) ---
+# Bir kontrol buffer'ını aşıp şüphe bildirdiğinde "tespit" sayılır. Her sayılan tespit ANINDA loglanır ve
+# voidguard.alerts iznine sahip yetkililere bildirilir. Aynı oyuncu+kontrol için required kadar tespit
+# tamamlanır tamamlanmaz ceza uygulanır.
+detections:
+  required: 3                  # ceza için gereken tespit sayısı (kontrol başına)
+  min-interval-ms: 1500        # aynı olayın tekrarı sayılmaz: iki sayılan tespit arası en az bu kadar süre
+  window-seconds: 600          # bu süre boyunca yeni tespit gelmezse sayaç sıfırlanır (normal oyuncuyu korur)
+
 # --- Ceza ---
 punishment:
   enabled: true
@@ -80,6 +89,10 @@ effect:
   lift:
     enabled: false             # VARSAYILAN KAPALI. Açılırsa oyuncu güvenli yüksekliğe kaldırılır ve sonda eski konumuna döner
     height: 2.0                # en fazla 5; üstü boş değilse otomatik kısaltılır
+  rise:
+    enabled: true              # yükselme hissi: oyuncu etrafında yukarı tırmanan parçacıklar (oyuncu hareket etmez)
+  wither-head:
+    enabled: true              # wither kafası görünümü: yalnızca parçacık (varlık/boss oluşturulmaz)
   fake-items:
     enabled: false             # VARSAYILAN KAPALI. Yalnızca eşya PARÇACIĞI gösterir; gerçek envanter/eşya etkilenmez
     count: 4
@@ -202,6 +215,14 @@ messages:
   not-banned: "&c{oyuncu} için aktif ban bulunamadı."
   alert: "&8[&5VG&8] &f{oyuncu} &7şüpheli: &e{hile} &7(VL &c{vl}&7, ping {ping}) &8{kanit}"
   punished: "&c{oyuncu} &7cezalandırıldı: &e{hile} &8({tur})"
+  ban-failed: "&4&lHATA &c{oyuncu} için ceza tam uygulanamadı: &7{sebep} &8(konsolu kontrol edin)"
+  detection:
+    - "&5[VOIDGUARD] &c&lHİLE TESPİT EDİLDİ!"
+    - "&7Oyuncu: &f{oyuncu}"
+    - "&7Hile türü: &e{hile}"
+    - "&7Tespit sayısı: &c{sayi}/{gerekli}"
+    - "&7İhlal seviyesi: &c{vl}"
+    - "&7Kanıt: &f{kanit}"
   dry-run: "&e[Test modu] &f{oyuncu} &7cezalandırılacaktı: &e{hile}"
   check-header: "&5&lVOIDGUARD &7| &f{oyuncu} &8(ping {ping} ms)"
   check-none: "&7Kayıt yok."

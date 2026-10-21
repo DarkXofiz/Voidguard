@@ -35,12 +35,7 @@ final class MovementListener implements Listener {
         Location f = e.getFrom(), t = e.getTo();
         if (t == null) return;
         double dx = t.getX() - f.getX(), dy = t.getY() - f.getY(), dz = t.getZ() - f.getZ();
-        if (dx * dx + dz * dz > 1.0E-6 || dy > 0.001) {
-            Location n = f.clone();
-            n.setYaw(t.getYaw());
-            n.setPitch(t.getPitch());
-            e.setTo(n);
-        }
+        if (dx * dx + dz * dz > 1.0E-6 || dy > 0.001) e.setCancelled(true);   // iptal = teleport olayı yok, bedava süre yok
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

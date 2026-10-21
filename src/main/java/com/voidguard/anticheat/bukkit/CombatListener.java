@@ -37,12 +37,12 @@ final class CombatListener implements Listener {
 
     /** İstatistiksel kontroller (CPS, Reach tamponu...) için: lag/TPS düşüşünde atla. */
     private boolean skip(Player p, PlayerData d) {
-        return plugin.exemptReason(p, d) != null || plugin.lagging(p, d);
+        return plugin.combatExempt(p, d) != null || plugin.lagging(p, d);
     }
 
     /** Geometrik kontroller (duvar, bakış açısı) için: yalnızca muafiyet ve aşırı ping. TPS düşüşü bunları kapatmaz. */
     private boolean skipGeometry(Player p, PlayerData d) {
-        return plugin.exemptReason(p, d) != null || Compat.ping(p) > 700;
+        return plugin.combatExempt(p, d) != null || Compat.ping(p) > 700;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -118,7 +118,7 @@ final class CombatListener implements Listener {
             return;
         }
         if (e.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK) return;
-        if (d.bypass || plugin.exemptReason(p, d) != null) return;
+        if (d.bypass || plugin.combatExempt(p, d) != null) return;
         Entity target = e.getEntity();
         if (target == p) return;
 

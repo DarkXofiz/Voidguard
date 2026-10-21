@@ -32,8 +32,8 @@ safety:
 # Şüphe puanı: her kanıt (weight x check-weight) puan ekler, zamanla azalır.
 suspicion:
   decay-per-second: 0.15
-  alert-points-per-check: 4      # bir kontrolün puanı bunu aşınca staff'a bildir
-  alert-cooldown-seconds: 3
+  alert-points-per-check: 1      # bir kontrolün puanı bunu aşınca staff'a bildir (1 = her log; dondurma kanıtı kestiği için düşük tutulur)
+  alert-cooldown-seconds: 2
 
 # Staff / OP bildirimleri
 alerts:
@@ -58,19 +58,22 @@ sanctions:
   instant:
     enabled: true
     min-points: 1                # kontrolün puanı bu değere ulaşınca (ilk kanıt) geri alma devreye girer
-    block-seconds: 3             # saldırı / blok koyma / konteyner engeli süresi
-    move-freeze-seconds: 2       # hareket dondurma süresi (yerinden oynayamaz, yukarı çıkamaz)
+    block-seconds: 8             # saldırı (Aura/Reach/Aim...) / blok koyma / konteyner engeli süresi
+    move-freeze-seconds: 3       # hareket dondurma süresi (yerinden oynayamaz, yukarı çıkamaz)
   # ===== LOG SAYACI (en önemli kural) =====
-  # Yetkililere giden "gerçek" log = bir kontrolün puanı suspicion.alert-points-per-check eşiğini aştı.
-  #   2. gerçek log  -> oyuncunun VURUŞLARI 30 sn engellenir (hile açmayan bunu görmez; gerçek log çıkmaz)
+  # Yetkililere giden HER log sayılır (loglar arası en az min-gap-seconds).
+  #   2. log  -> oyuncunun VURUŞLARI 30 sn engellenir
   #   3. log (ban-uygun hile) -> oyuncu birden DONAR, etraf KARARIR, 5 blok YÜKSELİR ve BAN yer
-  # Yanlış pozitif koruması: yalnızca ban-eligible kontroller ban sayacına girer, loglar arası en az
-  # min-gap-seconds geçmeli, sayaç window-seconds sonra sıfırlanır, lag/muafiyet sırasında kanıt üretilmez.
+  # Her log'da oyuncu zaten 3 sn donar / vuruşları 8 sn engellenir (instant). Dondurma yeni kanıtı da keser,
+  # bu yüzden sayaç kanıt başına işler. Yanlış pozitif görürseniz min-points'i 2-3 yapın veya logs-required'i artırın.
+  # Koruma: yalnızca ban-eligible kontroller sayılır, kanıt zaten tampon + lag/muafiyet filtresinden geçer,
+  # sayaç window-seconds sonra sıfırlanır.
   log-ban:
     enabled: true
     logs-required: 3
-    window-seconds: 180
-    min-gap-seconds: 3
+    min-points: 1.0              # logun sayılması için kontrol puanı (1.0 = tampondan geçen her kanıt)
+    window-seconds: 120
+    min-gap-seconds: 2
     attack-block-at: 2
     attack-block-seconds: 30
   # Ban kararı verilince oyuncu hemen atılmaz: yerinde DONAR (hareket edemez), etrafında kırmızı

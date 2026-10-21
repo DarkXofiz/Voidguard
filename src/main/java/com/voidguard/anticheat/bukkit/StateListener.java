@@ -51,6 +51,8 @@ final class StateListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onTeleport(PlayerTeleportEvent e) {
         PlayerData d = plugin.data(e.getPlayer());
+        // Dondurma / ban sahnesi sürerken hiçbir ışınlanma hileciye bedava süre kazandırmaz
+        if (d.voidSeq || d.mitActive("MOVE", System.currentTimeMillis())) { d.resetMotionState(); return; }
         // Kendi geri-ışınlamamız kısa tolerans alır (hileciye 30 tik bedava süre verme)
         int ticks = d.selfSetback ? 5 : plugin.cfg().i("safety.teleport-grace-ticks", 30);
         d.selfSetback = false;

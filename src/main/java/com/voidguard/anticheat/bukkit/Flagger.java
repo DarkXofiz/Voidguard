@@ -84,10 +84,10 @@ final class Flagger {
     }
 
     /**
-     * Staff logu. "Gerçek" log = kontrol puanı eşiği aştı. Gerçek loglar sayılır:
-     *  - 2. gerçek logda saldırılar 30 sn engellenir,
+     * Staff logu. Yetkililere giden HER log sayılır (min-gap aralıklı, window içinde):
+     *  - 2. logda saldırılar 30 sn engellenir,
      *  - ban-uygun hilelerin 3. logunda oyuncu donar, kararır, 5 blok yükselir ve banlanır.
-     * Yalnızca ban-uygun kontroller ve yalnızca puan eşiğini aşan loglar ban sayacına girer (yanlış pozitif koruması).
+     * Yalnızca ban-uygun kontroller ban sayacına girer; kanıt zaten tampon ve lag/muafiyet filtresinden geçmiştir.
      */
     private void alert(Player p, PlayerData d, String check, String detail, double pts, long now) {
         VoidGuardConfig c = plugin.cfg();
@@ -101,10 +101,11 @@ final class Flagger {
 
         boolean lb = c.b("sanctions.log-ban.enabled", true);
         int need = Math.max(1, c.i("sanctions.log-ban.logs-required", 3));
+        double minPts = c.d("sanctions.log-ban.min-points", 1.0);
         boolean counted = false, eligible = c.rule(check).banEligible();
-        if (real && lb && !d.voidSeq) {
-            long window = c.i("sanctions.log-ban.window-seconds", 180) * 1000L;
-            long gap = c.i("sanctions.log-ban.min-gap-seconds", 3) * 1000L;
+        if (lb && pts >= minPts && !d.voidSeq) {
+            long window = c.i("sanctions.log-ban.window-seconds", 120) * 1000L;
+            long gap = c.i("sanctions.log-ban.min-gap-seconds", 2) * 1000L;
             prune(d.logAll, now - window);
             prune(d.logBan, now - window);
             if (now - d.lastLogMs >= gap) {
@@ -118,7 +119,7 @@ final class Flagger {
         StringBuilder sb = new StringBuilder("&4&l⚠ &c&lVOIDGUARD &8» &f").append(p.getName())
                 .append(" &8| &c").append(check)
                 .append(String.format(Locale.ROOT, " &8(&c%.1f &7puan&8)", pts));
-        if (real && lb && eligible) sb.append(" &8| &cLOG &4").append(Math.min(d.logBan.size(), need)).append("&8/&4").append(need);
+        if (counted && eligible) sb.append(" &8| &cLOG &4").append(Math.min(d.logBan.size(), need)).append("&8/&4").append(need);
         sb.append(" &8| &7").append(detail);
         sb.append(" &8| &7ping &f").append(Compat.ping(p));
         String msg = ChatColor.translateAlternateColorCodes('&', sb.toString());
@@ -127,7 +128,7 @@ final class Flagger {
             boolean op = c.b("alerts.notify-ops", true) && s.isOp();
             boolean staff = s.hasPermission("voidguard.alerts");
             if (op && opsAll) s.sendMessage(msg);
-            else if ((staff || op) && real) s.sendMessage(msg);
+            else if ((staff || op) && (real || counted)) s.sendMessage(msg);
         }
         if (c.b("logging.console", false) && d.suspicion.total(now) >= c.d("logging.console-min-total", 8))
             plugin.getLogger().info(p.getName() + " " + check + " (" + String.format(Locale.ROOT, "%.1f", pts) + ") " + detail);

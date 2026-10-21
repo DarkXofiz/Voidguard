@@ -40,10 +40,11 @@ etrafında kırmızı partikül çemberi döner, yukarı doğru havalanır ve te
 kaydedilir, sahne sırasında çıkan oyuncu yine banlıdır. Ayar: `sanctions.void-sequence.*` (kapatılırsa anında atılır).
 
 **Log kuralları (en önemlisi):**
-- Yetkililere giden "gerçek" log = bir kontrolün puanı eşiği aştı. Satır biçimi: `⚠ VOIDGUARD » oyuncu | Kontrol (puan) | LOG 2/3 | detay | ping`.
-- **2. gerçek log:** oyuncunun vuruşları **30 sn** engellenir.
+- Yetkililere giden **her log** sayılır. Satır biçimi: `⚠ VOIDGUARD » oyuncu | Kontrol (puan) | LOG 2/3 | detay | ping`.
+- **Her log'da:** hareket hilesinde oyuncu 3 sn **donar ve yürüyemez** (son temiz konuma geri alınır); Aura/Reach/Aim gibi saldırı hilelerinde vuruşlar 8 sn **engellenir**. Elytra/uçuş açık olsa da saldırılar doğrulanır ve engellenir.
+- **2. log:** oyuncunun vuruşları **30 sn** engellenir.
 - **3. log (ban-uygun hile):** oyuncu birden **donar**, etraf **kararır**, **5 blok yükselir** ve **30 gün ban** yer.
-- Hile açmayanlar için koruma: yalnızca ban-uygun kontroller sayılır, loglar arası en az 3 sn olmalı, sayaç 180 sn sonra sıfırlanır, lag/muafiyette kanıt üretilmez.
+- Yanlış pozitif koruması: yalnızca ban-uygun kontroller sayılır, kanıt zaten tampon + lag/muafiyet filtresinden geçer, loglar arası en az 2 sn, sayaç 120 sn sonra sıfırlanır. Gerekirse `min-points` / `logs-required` artırılır.
 - Fly/Step/HighJump (dikey fizik) TPS düşüşünde kapanmaz; sürekli havada kalma ayrıca yakalanır.
 - Ayarlar: `sanctions.log-ban.*`, `sanctions.void-sequence.*`, `sanctions.ban-duration-days`.
 

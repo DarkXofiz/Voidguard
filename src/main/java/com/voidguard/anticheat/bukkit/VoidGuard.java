@@ -165,6 +165,21 @@ public final class VoidGuard extends JavaPlugin {
         return null;
     }
 
+    /**
+     * Saldırı kontrolleri (Aura, Reach, Aim, AutoClicker...) için muafiyet. Elytra, uçuş, araç, riptide muafiyeti
+     * YOKTUR: elytra/uçuş açıkken de vuruşlar doğrulanır ve hileli vuruşlar engellenir.
+     */
+    String combatExempt(Player p, PlayerData d) {
+        if (d.voidSeq) return "voidguard";
+        if (d.bypass) return "bypass";
+        if (nowMs() < d.exemptUntilMs) return "exempt";
+        GameMode gm = p.getGameMode();
+        if (gm == GameMode.CREATIVE || gm == GameMode.SPECTATOR) return "gamemode";
+        if (p.isDead() || p.isSleeping()) return "state";
+        if (cfg.list("general.disabled-worlds").contains(p.getWorld().getName())) return "world";
+        return null;
+    }
+
     private void heartbeat() {
         tps = Compat.tps();
         long now = nowMs();

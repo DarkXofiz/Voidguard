@@ -11,9 +11,37 @@ public final class SanctionPolicy {
     public enum Stage { LOG, WARN_MITIGATE, RESTRICT, BAN }
 
     /** Hile türü başına kural (config'ten gelir). */
-    public record Rule(boolean banEligible, int violationsToRestrict, int violationsToBan,
-                       double confirmPoints, double strongPoints, long expireMs, long violationCooldownMs,
-                       int mitigationSeconds, int restrictSeconds) {}
+    public static final class Rule {
+        private final boolean banEligible;
+        private final int violationsToRestrict;
+        private final int violationsToBan;
+        private final double confirmPoints;
+        private final double strongPoints;
+        private final long expireMs;
+        private final long violationCooldownMs;
+        private final int mitigationSeconds;
+        private final int restrictSeconds;
+        public Rule(boolean banEligible, int violationsToRestrict, int violationsToBan, double confirmPoints, double strongPoints, long expireMs, long violationCooldownMs, int mitigationSeconds, int restrictSeconds) {
+            this.banEligible = banEligible;
+            this.violationsToRestrict = violationsToRestrict;
+            this.violationsToBan = violationsToBan;
+            this.confirmPoints = confirmPoints;
+            this.strongPoints = strongPoints;
+            this.expireMs = expireMs;
+            this.violationCooldownMs = violationCooldownMs;
+            this.mitigationSeconds = mitigationSeconds;
+            this.restrictSeconds = restrictSeconds;
+        }
+        public boolean banEligible() { return banEligible; }
+        public int violationsToRestrict() { return violationsToRestrict; }
+        public int violationsToBan() { return violationsToBan; }
+        public double confirmPoints() { return confirmPoints; }
+        public double strongPoints() { return strongPoints; }
+        public long expireMs() { return expireMs; }
+        public long violationCooldownMs() { return violationCooldownMs; }
+        public int mitigationSeconds() { return mitigationSeconds; }
+        public int restrictSeconds() { return restrictSeconds; }
+    }
 
     private SanctionPolicy() {}
 

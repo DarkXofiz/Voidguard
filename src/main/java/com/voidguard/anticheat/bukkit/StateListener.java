@@ -80,7 +80,7 @@ final class StateListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onGlide(EntityToggleGlideEvent e) {
-        if (e.getEntity() instanceof Player p) grace(p, "safety.glide-end-grace-ticks", 40);
+        if (e.getEntity() instanceof Player) grace((Player) e.getEntity(), "safety.glide-end-grace-ticks", 40);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -91,12 +91,12 @@ final class StateListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onVehicleExit(VehicleExitEvent e) {
-        if (e.getExited() instanceof Player p) grace(p, "safety.vehicle-exit-grace-ticks", 20);
+        if (e.getExited() instanceof Player) grace((Player) e.getExited(), "safety.vehicle-exit-grace-ticks", 20);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onVehicleEnter(VehicleEnterEvent e) {
-        if (e.getEntered() instanceof Player p) plugin.data(p).resetMotionState();
+        if (e.getEntered() instanceof Player) plugin.data((Player) e.getEntered()).resetMotionState();
     }
 
     /** Sunucu bir oyuncuya hız verdi (knockback, patlama, rüzgar topu, plugin). */
@@ -110,9 +110,9 @@ final class StateListener implements Listener {
         d.velocityUntilTick = Math.max(d.velocityUntilTick, tick + 12 + Math.min(80, (int) (25 * v.length())));
 
         boolean skip = plugin.exemptReason(p, d) != null || plugin.lagging(p, d)
-                || p.isInWater() || p.isInLava() || tick < d.liquidUntilTick || tick < d.climbUntilTick
+                || Compat.inWater(p) || Compat.inLava(p) || tick < d.liquidUntilTick || tick < d.climbUntilTick
                 || tick < d.bounceUntilTick || tick < d.pistonUntilTick
                 || Probe.knockbackBlocked(p, v);
-        d.velocity.onVelocity(v.getX(), v.getY(), v.getZ(), skip, VoidGuard.nowMs(), p.getPing());
+        d.velocity.onVelocity(v.getX(), v.getY(), v.getZ(), skip, VoidGuard.nowMs(), Compat.ping(p));
     }
 }

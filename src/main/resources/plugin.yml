@@ -1,7 +1,7 @@
 name: VoidGuard
 version: '${version}'
 main: com.voidguard.anticheat.bukkit.VoidGuard
-api-version: '1.21'
+api-version: '1.13'
 description: Düşük yanlış-pozitifli, kanıt tabanlı Paper AntiCheat
 authors: [VoidGuard]
 folia-supported: false

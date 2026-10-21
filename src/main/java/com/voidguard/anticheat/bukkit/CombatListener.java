@@ -4,7 +4,7 @@ import com.voidguard.anticheat.core.AimCheck;
 import com.voidguard.anticheat.core.Geometry.Box;
 import com.voidguard.anticheat.core.ReachCheck;
 import com.voidguard.anticheat.core.Result;
-import io.papermc.paper.event.player.PrePlayerAttackEntityEvent;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import org.bukkit.FluidCollisionMode;
@@ -15,6 +15,8 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
+import org.bukkit.event.Cancellable;
+import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
@@ -40,7 +42,7 @@ final class CombatListener implements Listener {
 
     /** Geometrik kontroller (duvar, bakış açısı) için: yalnızca muafiyet ve aşırı ping. TPS düşüşü bunları kapatmaz. */
     private boolean skipGeometry(Player p, PlayerData d) {
-        return plugin.exemptReason(p, d) != null || p.getPing() > 700;
+        return plugin.exemptReason(p, d) != null || Compat.ping(p) > 700;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -53,27 +55,52 @@ final class CombatListener implements Listener {
         if (r != null) plugin.flagger().flag(p, d, "AutoClicker", r);
     }
 
-    /** Saldırı girişimi: geçici saldırı engeli, CPS, vuruş aralığı, Criticals deseni. */
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onAttackAttempt(PrePlayerAttackEntityEvent e) {
-        Player p = e.getPlayer();
+    /** Paper'ın PrePlayerAttackEntityEvent olayı varsa (1.20.4+) saldırı girişimi oradan, yoksa hasar olayından işlenir. */
+    private boolean preAttackEvent;
+
+    @SuppressWarnings("unchecked")
+    void registerAttackAttempt() {
+        try {
+            final Class<? extends Event> evClass =
+                    (Class<? extends Event>) Class.forName("io.papermc.paper.event.player.PrePlayerAttackEntityEvent");
+            final Method getPlayer = evClass.getMethod("getPlayer");
+            final Method willAttack = evClass.getMethod("willAttack");
+            plugin.getServer().getPluginManager().registerEvent(evClass, this, EventPriority.HIGHEST, (l, ev) -> {
+                if (!evClass.isInstance(ev)) return;
+                try {
+                    Player p = (Player) getPlayer.invoke(ev);
+                    boolean will = (Boolean) willAttack.invoke(ev);
+                    if (attackAttempt(p, will)) ((Cancellable) ev).setCancelled(true);
+                } catch (Throwable t) {
+                    plugin.getLogger().warning("Saldırı girişimi işlenemedi: " + t);
+                }
+            }, plugin, true);
+            preAttackEvent = true;
+        } catch (Throwable t) {
+            preAttackEvent = false;      // eski sürüm: girişim hasar olayında işlenir
+        }
+    }
+
+    /** Saldırı girişimi: geçici saldırı engeli, CPS, vuruş aralığı, Criticals deseni. true = iptal et. */
+    private boolean attackAttempt(Player p, boolean willAttack) {
         PlayerData d = plugin.data(p);
-        if (d.mitActive("ATTACK", System.currentTimeMillis())) { e.setCancelled(true); return; }
+        if (d.mitActive("ATTACK", System.currentTimeMillis())) return true;
         long tick = plugin.tick();
         d.lastAttackTick = tick;
-        if (d.bypass || skip(p, d)) return;
+        if (d.bypass || skip(p, d)) return false;
         if (!relaxed(d)) {
             Result r = d.click.onSwing(VoidGuard.nowMs());
             if (r != null) plugin.flagger().flag(p, d, "AutoClicker", r);
-            if (e.willAttack()) {
+            if (willAttack) {
                 r = d.click.onAttack(tick);
                 if (r != null) plugin.flagger().flag(p, d, "AutoClicker", r);
             }
         }
-        if (e.willAttack()) {
+        if (willAttack) {
             Result r = d.criticals.onAttack(tick);
             if (r != null) plugin.flagger().flag(p, d, "Criticals", r);
         }
+        return false;
     }
 
     /**
@@ -82,9 +109,14 @@ final class CombatListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onHit(EntityDamageByEntityEvent e) {
-        if (!(e.getDamager() instanceof Player p)) return;
+        if (!(e.getDamager() instanceof Player)) return;
+        Player p = (Player) e.getDamager();
         PlayerData d = plugin.data(p);
         if (d.mitActive("ATTACK", System.currentTimeMillis())) { e.setCancelled(true); return; }
+        if (!preAttackEvent && e.getCause() == EntityDamageEvent.DamageCause.ENTITY_ATTACK && attackAttempt(p, true)) {
+            e.setCancelled(true);
+            return;
+        }
         if (e.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK) return;
         if (d.bypass || plugin.exemptReason(p, d) != null) return;
         Entity target = e.getEntity();
@@ -151,8 +183,9 @@ final class CombatListener implements Listener {
         List<Box> list = new ArrayList<>(8);
         Location l = t.getLocation();
         list.add(Box.ofEntity(l.getX(), l.getY(), l.getZ(), w, h));
-        long window = Math.max(100, attacker.getPing() + 150L);
-        if (t instanceof Player tp) {
+        long window = Math.max(100, Compat.ping(attacker) + 150L);
+        if (t instanceof Player) {
+            Player tp = (Player) t;
             PlayerData td = plugin.peek(tp.getUniqueId());
             if (td != null) td.collectBoxes(nowMs - window, w, h, list);
         } else {
@@ -214,7 +247,7 @@ final class CombatListener implements Listener {
             double dot = (eye.getX() - fx) * nx + (eye.getY() - fy) * ny + (eye.getZ() - fz) * nz;
             wrongFace = dot < -0.15;
             if (!relaxed(d)) {
-                RayTraceResult rr = p.rayTraceBlocks(6.0);
+                RayTraceResult rr = p.getWorld().rayTraceBlocks(eye, eye.getDirection(), 6.0, FluidCollisionMode.NEVER, false);
                 rayMiss = rr == null || rr.getHitBlock() == null || !rr.getHitBlock().equals(against);
             }
         }

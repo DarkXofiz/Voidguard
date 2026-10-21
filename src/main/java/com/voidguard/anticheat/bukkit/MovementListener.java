@@ -31,7 +31,7 @@ final class MovementListener implements Listener {
         Player p = e.getPlayer();
         PlayerData d = plugin.peek(p.getUniqueId());
         if (d == null || !d.mitActive("MOVE", System.currentTimeMillis())) return;
-        if (p.isInLava() || p.isInWater() || p.isInsideVehicle() || p.isGliding()) return;
+        if (Compat.inLava(p) || Compat.inWater(p) || p.isInsideVehicle() || p.isGliding()) return;
         Location f = e.getFrom(), t = e.getTo();
         if (t == null) return;
         double dx = t.getX() - f.getX(), dy = t.getY() - f.getY(), dz = t.getZ() - f.getZ();
@@ -123,7 +123,7 @@ final class MovementListener implements Listener {
                 d.criticals.onMove(tick, s, d.lastStanding);
                 bad |= flag(p, d, "GuiMove", d.window.onMoveWhileOpen(tick, s.hSpeed(), standing, special || velGrace));
 
-                boolean surface = !standing && !p.isInWater() && !p.isSwimming() && Probe.liquidBelow(w, tx, ty, tz);
+                boolean surface = !standing && !Compat.inWater(p) && !p.isSwimming() && Probe.liquidBelow(w, tx, ty, tz);
                 bad |= flag(p, d, "Jesus", d.jesus.onMove(surface, dy, s.hSpeed(), false));
 
                 if (cfg.enabled("Phase") && !special && !velGrace) bad |= phase(p, d, from, to, w);

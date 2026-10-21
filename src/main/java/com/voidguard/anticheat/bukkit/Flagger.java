@@ -5,8 +5,7 @@ import com.voidguard.anticheat.core.SanctionPolicy;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import org.bukkit.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -14,7 +13,6 @@ import org.bukkit.entity.Player;
 /** Kanıt -> kontrol başına puan -> (doğrulanmışsa) kalıcı ihlal -> kademeli müdahale. */
 final class Flagger {
     private final VoidGuard plugin;
-    private static final LegacyComponentSerializer AMP = LegacyComponentSerializer.legacyAmpersand();
 
     Flagger(VoidGuard plugin) { this.plugin = plugin; }
 
@@ -62,13 +60,17 @@ final class Flagger {
         if (pts < c.d("sanctions.instant.min-points", 2)) return;
         String type = c.mitigationType(check);
         switch (type) {
-            case "ATTACK", "PLACE", "CONTAINER" ->
-                    d.mitUntil.merge(type, now + (long) (c.d("sanctions.instant.block-seconds", 3) * 1000), Math::max);
-            case "MOVE" -> {
+            case "ATTACK":
+            case "PLACE":
+            case "CONTAINER":
+                d.mitUntil.merge(type, now + (long) (c.d("sanctions.instant.block-seconds", 3) * 1000), Math::max);
+                break;
+            case "MOVE":
                 d.mitUntil.merge("MOVE", now + (long) (c.d("sanctions.instant.move-freeze-seconds", 2) * 1000), Math::max);
                 plugin.sanctions().setback(p, d);
-            }
-            default -> { }
+                break;
+            default:
+                break;
         }
     }
 
@@ -84,7 +86,7 @@ final class Flagger {
         Long last = d.lastAlertMs.get(check);
         if (last != null && now - last < c.i("suspicion.alert-cooldown-seconds", 3) * 1000L) return;
         d.lastAlertMs.put(check, now);
-        Component msg = AMP.deserialize(String.format(Locale.ROOT,
+        String msg = ChatColor.translateAlternateColorCodes('&', String.format(Locale.ROOT,
                 "&4[&cVoidGuard&4] &c%s &4» &c%s &4(&c%.1f&4) &c%s", p.getName(), check, pts, detail));
         for (Player s : Bukkit.getOnlinePlayers()) {
             if (!plugin.alertsEnabled(s.getUniqueId())) continue;
@@ -115,7 +117,7 @@ final class Flagger {
                         + "\"weight\":%.2f,\"points\":%.2f,\"total\":%.2f,\"ping\":%d,\"tps\":%.2f,"
                         + "\"gamemode\":\"%s\",\"world\":\"%s\",\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"history\":%s}",
                 java.time.Instant.ofEpochMilli(now), type, ViolationLog.esc(p.getName()), d.uuid, ViolationLog.esc(check),
-                ViolationLog.esc(detail), weight, pts, total, p.getPing(), plugin.tps(), p.getGameMode(),
+                ViolationLog.esc(detail), weight, pts, total, Compat.ping(p), plugin.tps(), p.getGameMode(),
                 ViolationLog.esc(l.getWorld().getName()), l.getX(), l.getY(), l.getZ(), h);
         plugin.violationLog().write(json);
     }

@@ -2,8 +2,6 @@ package com.voidguard.anticheat.bukkit;
 
 import com.voidguard.anticheat.core.SanctionPolicy;
 import java.util.Locale;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -11,24 +9,23 @@ import org.bukkit.util.Vector;
 
 /** Doğrulanmış ihlallerde hile türüne özel geçici müdahale, oyuncu mesajı ve (kilitli) ban. */
 final class Sanctions {
-    private static final LegacyComponentSerializer SEC = LegacyComponentSerializer.legacySection();
     private final VoidGuard plugin;
 
     Sanctions(VoidGuard plugin) { this.plugin = plugin; }
 
     private static String noun(String type) {
-        return switch (type) {
-            case "ATTACK" -> "saldırıların";
-            case "MOVE" -> "hareketlerin";
-            case "PLACE" -> "blok yerleştirmelerin";
-            case "CONTAINER" -> "konteyner işlemlerin";
-            default -> "işlemlerin";
-        };
+        switch (type) {
+            case "ATTACK": return "saldırıların";
+            case "MOVE": return "hareketlerin";
+            case "PLACE": return "blok yerleştirmelerin";
+            case "CONTAINER": return "konteyner işlemlerin";
+            default: return "işlemlerin";
+        }
     }
 
     private static String cap(String s) { return Character.toUpperCase(s.charAt(0)) + s.substring(1); }
 
-    private void tell(Player p, String legacy) { p.sendMessage(SEC.deserialize(legacy)); }
+    private void tell(Player p, String legacy) { p.sendMessage(legacy); }
 
     void execute(Player p, PlayerData d, String check, SanctionPolicy.Stage st, int n,
                  SanctionPolicy.Rule rule, long nowWall) {
@@ -39,19 +36,20 @@ final class Sanctions {
                 ? "§7(" + Math.min(n, rule.violationsToBan()) + "/" + rule.violationsToBan() + ")"
                 : "§7(" + n + ")";
         switch (st) {
-            case LOG -> { }
-            case WARN_MITIGATE -> {
+            case LOG:
+                return;
+            case WARN_MITIGATE:
                 if (!canMitigate) return;
                 start(p, d, type, rule.mitigationSeconds(), nowWall);
                 tell(p, "§c§lVoidGuard §8» §eŞüpheli hareketlerin algılandı! " + rule.mitigationSeconds()
                         + " saniye boyunca " + noun(type) + " engellendi. " + counter);
-            }
-            case RESTRICT -> {
+                return;
+            case RESTRICT:
                 if (!canMitigate) return;
                 start(p, d, type, rule.restrictSeconds(), nowWall);
                 tell(p, "§c§lVoidGuard §8» §6Hile şüphesi devam ediyor! " + cap(noun(type)) + " kısıtlandı. " + counter);
-            }
-            case BAN -> {
+                return;
+            case BAN:
                 if (c.banActive()) {
                     long until = nowWall + (long) (c.d("sanctions.ban-duration-days", 7) * 86_400_000L);
                     // Ban önce deftere yazılır: sahne sürerken çıkıp girerek kaçılamaz.
@@ -70,15 +68,17 @@ final class Sanctions {
                     }
                     notifyWouldBan(p, d, check, n, nowWall);
                 }
-            }
+                return;
+            default:
+                return;
         }
     }
 
     /** Ban ekranıyla oyuncuyu atar (sahne bitince veya sahne kapalıysa hemen). */
     void kickBanned(Player p, long until, int need) {
         String counter = "§7(" + need + "/" + need + ")";
-        p.kick(SEC.deserialize("§c§lVoidGuard §8» §cBirden fazla hile ihlali tespit edildi. Sunucudan yasaklandın. "
-                + counter + "\n" + remaining(until, System.currentTimeMillis())));
+        p.kickPlayer("§c§lVoidGuard §8» §cBirden fazla hile ihlali tespit edildi. Sunucudan yasaklandın. "
+                + counter + "\n" + remaining(until, System.currentTimeMillis()));
     }
 
     /** Giriş engeli ve kick mesajı için kalan süre. */
@@ -94,9 +94,9 @@ final class Sanctions {
     private void notifyWouldBan(Player p, PlayerData d, String check, int n, long now) {
         VoidGuardConfig c = plugin.cfg();
         if (!c.b("alerts.notify-when-not-punished", true)) return;
-        Component msg = SEC.deserialize(String.format(Locale.ROOT,
+        String msg = String.format(Locale.ROOT,
                 "§4[§cVoidGuard§4] §c⚠ §c%s §7için ban koşulları oluştu (§c%s§7, %d. ihlal) ama ban KAPALI olduğu için §aatılmadı§7. §8/vg status %s",
-                p.getName(), check, n, p.getName()));
+                p.getName(), check, n, p.getName());
         for (Player s : Bukkit.getOnlinePlayers()) {
             if (!plugin.alertsEnabled(s.getUniqueId())) continue;
             if ((c.b("alerts.notify-ops", true) && s.isOp()) || s.hasPermission("voidguard.alerts")) s.sendMessage(msg);

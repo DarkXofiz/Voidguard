@@ -27,7 +27,8 @@ final class InventoryListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onOpen(InventoryOpenEvent e) {
-        if (!(e.getPlayer() instanceof Player p)) return;
+        if (!(e.getPlayer() instanceof Player)) return;
+        Player p = (Player) e.getPlayer();
         PlayerData d = plugin.data(p);
         if (realContainer(e.getInventory())) d.window.onOpen(plugin.tick());
         else d.window.onClose();
@@ -35,14 +36,16 @@ final class InventoryListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onClose(InventoryCloseEvent e) {
-        if (!(e.getPlayer() instanceof Player p)) return;
+        if (!(e.getPlayer() instanceof Player)) return;
+        Player p = (Player) e.getPlayer();
         plugin.data(p).window.onClose();
     }
 
     /** Geçici konteyner engeli (ChestStealer müdahalesi): yalnızca gerçek blok konteynerlerinde. */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onClickBlock(InventoryClickEvent e) {
-        if (!(e.getWhoClicked() instanceof Player p)) return;
+        if (!(e.getWhoClicked() instanceof Player)) return;
+        Player p = (Player) e.getWhoClicked();
         PlayerData d = plugin.peek(p.getUniqueId());
         if (d != null && d.mitActive("CONTAINER", System.currentTimeMillis()) && realContainer(e.getView().getTopInventory()))
             e.setCancelled(true);
@@ -50,7 +53,8 @@ final class InventoryListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onClick(InventoryClickEvent e) {
-        if (!(e.getWhoClicked() instanceof Player p)) return;
+        if (!(e.getWhoClicked() instanceof Player)) return;
+        Player p = (Player) e.getWhoClicked();
         if (!e.getClick().isShiftClick()) return;
         if (!realContainer(e.getView().getTopInventory())) return;
         if (e.getClickedInventory() == null || e.getClickedInventory() != e.getView().getTopInventory()) return;

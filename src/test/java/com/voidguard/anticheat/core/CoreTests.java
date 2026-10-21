@@ -259,21 +259,21 @@ public class CoreTests {
         Box target = Box.ofEntity(0, 0, 3.0, 0.6, 1.8);
         // meşru: göz (0,1.62,0) – hedef 2.4 blok önde
         ReachCheck rc = new ReachCheck(0.25, 6); int n = 0;
-        for (int i = 0; i < 100; i++) if (rc.onHit(0, 1.62, 0, List.of(Box.ofEntity(0, 0, 2.8, 0.6, 1.8)), 3.0) != null) n++;
+        for (int i = 0; i < 100; i++) if (rc.onHit(0, 1.62, 0, java.util.Arrays.asList(Box.ofEntity(0, 0, 2.8, 0.6, 1.8)), 3.0) != null) n++;
         check(n == 0, "Reach: 2.5 blok normal vuruş");
         // lag: hedef geçmişte yakın, şimdi uzak (ping penceresi)
         rc = new ReachCheck(0.25, 6); n = 0;
-        for (int i = 0; i < 100; i++) if (rc.onHit(0, 1.62, 0, List.of(Box.ofEntity(0, 0, 4.4, 0.6, 1.8), Box.ofEntity(0, 0, 3.4, 0.6, 1.8)), 3.0) != null) n++;
+        for (int i = 0; i < 100; i++) if (rc.onHit(0, 1.62, 0, java.util.Arrays.asList(Box.ofEntity(0, 0, 4.4, 0.6, 1.8), Box.ofEntity(0, 0, 3.4, 0.6, 1.8)), 3.0) != null) n++;
         check(n == 0, "Reach: lag geçmişinde ulaşılabilir hedef");
         rc = new ReachCheck(0.25, 6); n = 0;
-        for (int i = 0; i < 20; i++) if (rc.onHit(0, 1.62, 0, List.of(Box.ofEntity(0, 0, 4.2, 0.6, 1.8)), 3.0) != null) n++;
+        for (int i = 0; i < 20; i++) if (rc.onHit(0, 1.62, 0, java.util.Arrays.asList(Box.ofEntity(0, 0, 4.2, 0.6, 1.8)), 3.0) != null) n++;
         check(n > 0, "Reach 3.9 blok tespit");
 
         AimCheck ac = new AimCheck(0.15, 7); n = 0;
-        for (int i = 0; i < 50; i++) if (ac.onHit(0, 1.62, 0, 0f, 0f, List.of(Box.ofEntity(0, 0, 2.5, 0.6, 1.8)), 3.0) != null) n++;
+        for (int i = 0; i < 50; i++) if (ac.onHit(0, 1.62, 0, 0f, 0f, java.util.Arrays.asList(Box.ofEntity(0, 0, 2.5, 0.6, 1.8)), 3.0) != null) n++;
         check(n == 0, "Aim: hedefe bakarak vuruş");
         ac = new AimCheck(0.15, 7); n = 0;
-        for (int i = 0; i < 30; i++) if (ac.onHit(0, 1.62, 0, 90f, 0f, List.of(Box.ofEntity(0, 0, 2.5, 0.6, 1.8)), 3.0) != null) n++;
+        for (int i = 0; i < 30; i++) if (ac.onHit(0, 1.62, 0, 90f, 0f, java.util.Arrays.asList(Box.ofEntity(0, 0, 2.5, 0.6, 1.8)), 3.0) != null) n++;
         check(n > 0, "Aim: 90° yana bakıp vurma (rotasyonsuz Aura)");
 
         AuraCheck au = new AuraCheck(3, 5, 60); n = 0;
@@ -392,7 +392,7 @@ public class CoreTests {
 
     static void policy() {
         System.out.println("[İhlal defteri / basamaklar / kalıcılık]");
-        var r = rule(true);
+        SanctionPolicy.Rule r = rule(true);
         check(SanctionPolicy.level(3, r) == SanctionPolicy.Level.LOW, "düşük puan = LOW (yalnızca kayıt)");
         check(SanctionPolicy.stage(SanctionPolicy.Level.LOW, 5, r, 3, 2) == SanctionPolicy.Stage.LOG, "LOW kanıtta ihlal sayısı kaç olursa olsun LOG");
         check(SanctionPolicy.level(8, r) == SanctionPolicy.Level.MEDIUM && SanctionPolicy.level(20, r) == SanctionPolicy.Level.HIGH, "MEDIUM/HIGH eşikleri");
@@ -451,7 +451,7 @@ public class CoreTests {
         for (int i = 0; i < 100; i++) if (a.onHit(0.2 + r.nextDouble() * 0.4) != null) n++;
         check(n > 0, "AimAssist: hep merkeze kilitli nişan tespit");
 
-        var box = List.of(Box.ofEntity(0, 0, 3, 0.6, 1.8));
+        List<Box> box = java.util.Arrays.asList(Box.ofEntity(0, 0, 3, 0.6, 1.8));
         check(AimCheck.minAngle(0, 1.62, 0, 0f, 0f, box) < 15, "minAngle: hedefe bakarken küçük açı");
         check(AimCheck.minAngle(0, 1.62, 0, 180f, 0f, box) > 150, "minAngle: arkaya bakarken büyük açı");
     }

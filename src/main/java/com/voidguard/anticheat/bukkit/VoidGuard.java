@@ -51,7 +51,9 @@ public final class VoidGuard extends JavaPlugin {
 
         Bukkit.getPluginManager().registerEvents(new StateListener(this), this);
         Bukkit.getPluginManager().registerEvents(new MovementListener(this), this);
-        Bukkit.getPluginManager().registerEvents(new CombatListener(this), this);
+        CombatListener combat = new CombatListener(this);
+        Bukkit.getPluginManager().registerEvents(combat, this);
+        combat.registerAttackAttempt();
         Bukkit.getPluginManager().registerEvents(new InventoryListener(this), this);
         Bukkit.getPluginManager().registerEvents(new VoidSequenceListener(this), this);
 
@@ -142,7 +144,7 @@ public final class VoidGuard extends JavaPlugin {
     /** Lag/bağlantı koşulları nedeniyle bu oyuncudan KANIT toplanmamalı mı? */
     boolean lagging(Player p, PlayerData d) {
         if (tps < cfg.d("safety.min-tps", 18.0)) return true;
-        if (p.getPing() > cfg.i("safety.max-ping-ms", 400)) return true;
+        if (Compat.ping(p) > cfg.i("safety.max-ping-ms", 400)) return true;
         return tick < d.pingGraceUntilTick;
     }
 
@@ -164,7 +166,7 @@ public final class VoidGuard extends JavaPlugin {
     }
 
     private void heartbeat() {
-        try { tps = Math.min(20.0, Bukkit.getTPS()[0]); } catch (Throwable ignored) { }
+        tps = Compat.tps();
         long now = nowMs();
         String perm = cfg.s("general.bypass-permission", "voidguard.bypass");
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -172,7 +174,7 @@ public final class VoidGuard extends JavaPlugin {
             PlayerData d = peek(p.getUniqueId());
             if (d == null) continue;
             d.bypass = p.hasPermission(perm);
-            int ping = p.getPing();
+            int ping = Compat.ping(p);
             if (d.lastPing >= 0 && Math.abs(ping - d.lastPing) > cfg.i("safety.ping-jump-ms", 120))
                 d.pingGraceUntilTick = tick + cfg.i("safety.ping-jump-grace-ticks", 60);
             d.lastPing = ping;
@@ -184,7 +186,7 @@ public final class VoidGuard extends JavaPlugin {
     }
 
     List<String> checkNames() {
-        return List.of("Reach", "Aim", "Aura", "AutoClicker", "Velocity", "Fly", "Step", "HighJump", "Speed", "Timer",
+        return java.util.Arrays.asList("Reach", "Aim", "Aura", "AutoClicker", "Velocity", "Fly", "Step", "HighJump", "Speed", "Timer",
                 "NoFall", "NoSlow", "Scaffold", "Criticals", "ChestStealer", "GuiMove", "Rotation", "Phase", "Jesus", "Spider", "AimAssist");
     }
 }

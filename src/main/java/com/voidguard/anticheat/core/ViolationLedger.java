@@ -147,7 +147,7 @@ public final class ViolationLedger {
     public synchronized int load(String text) {
         int bad = 0;
         for (String line : text.split("\n")) {
-            if (line.isBlank() || line.startsWith("#")) continue;
+            if (line.trim().isEmpty() || line.startsWith("#")) continue;
             try {
                 String[] p = line.split("\\|", -1);
                 UUID id = UUID.fromString(p[1]);
@@ -155,7 +155,7 @@ public final class ViolationLedger {
                 if (p[0].equals("V")) {
                     r.name = p[2];
                     List<Long> l = r.violations.computeIfAbsent(p[3], k -> new ArrayList<>());
-                    for (String t : p[4].split(",")) if (!t.isBlank()) l.add(Long.parseLong(t.trim()));
+                    for (String t : p[4].split(",")) if (!t.trim().isEmpty()) l.add(Long.parseLong(t.trim()));
                 } else if (p[0].equals("B")) {
                     r.name = p[2];
                     r.banUntil = Long.parseLong(p[3].trim());
@@ -174,7 +174,7 @@ public final class ViolationLedger {
     public static void writeAtomic(Path file, String content) throws IOException {
         Files.createDirectories(file.getParent());
         Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-        Files.writeString(tmp, content, StandardCharsets.UTF_8);
+        Files.write(tmp, content.getBytes(StandardCharsets.UTF_8));
         try {
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (java.nio.file.AtomicMoveNotSupportedException e) {
@@ -183,6 +183,6 @@ public final class ViolationLedger {
     }
 
     public static String read(Path file) throws IOException {
-        return Files.exists(file) ? Files.readString(file, StandardCharsets.UTF_8) : "";
+        return Files.exists(file) ? new String(Files.readAllBytes(file), StandardCharsets.UTF_8) : "";
     }
 }

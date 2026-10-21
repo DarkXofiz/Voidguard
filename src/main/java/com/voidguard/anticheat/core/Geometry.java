@@ -4,7 +4,27 @@ package com.voidguard.anticheat.core;
 public final class Geometry {
     private Geometry() {}
 
-    public record Box(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+    public static final class Box {
+        private final double minX;
+        private final double minY;
+        private final double minZ;
+        private final double maxX;
+        private final double maxY;
+        private final double maxZ;
+        public Box(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+            this.minX = minX;
+            this.minY = minY;
+            this.minZ = minZ;
+            this.maxX = maxX;
+            this.maxY = maxY;
+            this.maxZ = maxZ;
+        }
+        public double minX() { return minX; }
+        public double minY() { return minY; }
+        public double minZ() { return minZ; }
+        public double maxX() { return maxX; }
+        public double maxY() { return maxY; }
+        public double maxZ() { return maxZ; }
         public static Box ofEntity(double x, double y, double z, double width, double height) {
             double h = width / 2.0;
             return new Box(x - h, y, z - h, x + h, y + height, z + h);

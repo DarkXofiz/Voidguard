@@ -2,9 +2,7 @@ package com.voidguard.anticheat.bukkit;
 
 import java.util.Collection;
 import org.bukkit.Material;
-import org.bukkit.Registry;
-import org.bukkit.NamespacedKey;
-import org.bukkit.Tag;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -16,7 +14,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Shulker;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.util.BoundingBox;
+import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 /** Sunucu tarafı çarpışma/ortam sorguları. Yüklü olmayan chunk'a ASLA dokunmaz (chunk yüklemez). */
@@ -38,13 +36,13 @@ final class Probe {
                 for (int by = yTop; by >= yBot; by--) {
                     Block b = w.getBlockAt(bx, by, bz);
                     Material m = b.getType();
-                    if (m.isAir() || b.isPassable()) continue;
+                    if (Compat.isAir(m) || b.isPassable()) continue;
                     // DİKKAT: her zaman gerçek çarpışma şekli. Çamur (0.875), ruh kumu, tarla, patika tam küp DEĞİLDİR.
                     double top = Double.NEGATIVE_INFINITY;
-                    for (BoundingBox bb : b.getCollisionShape().getBoundingBoxes()) {
-                        if (bx + bb.getMaxX() <= x - HALF + EPS || bx + bb.getMinX() >= x + HALF - EPS
-                                || bz + bb.getMaxZ() <= z - HALF + EPS || bz + bb.getMinZ() >= z + HALF - EPS) continue;
-                        top = Math.max(top, by + bb.getMaxY());
+                    for (double[] bb : Compat.collisionBoxes(b)) {   // {minX,minY,minZ,maxX,maxY,maxZ}
+                        if (bx + bb[3] <= x - HALF + EPS || bx + bb[0] >= x + HALF - EPS
+                                || bz + bb[5] <= z - HALF + EPS || bz + bb[2] >= z + HALF - EPS) continue;
+                        top = Math.max(top, by + bb[4]);
                     }
                     if (top >= y - tolBelow && top <= y + 0.003) return true;
                 }
@@ -55,10 +53,11 @@ final class Probe {
 
     /** Bot/shulker/vagon üstünde durma (blok yok ama gerçek zemin). Yalnızca gerekirse çağrılır. */
     static boolean entitySupport(Player p, double x, double y, double z) {
-        BoundingBox box = new BoundingBox(x - 0.4, y - 0.35, z - 0.4, x + 0.4, y + 0.05, z + 0.4);
-        Collection<Entity> list = p.getWorld().getNearbyEntities(box,
-                e -> e != p && (e instanceof Boat || e instanceof Shulker || e instanceof Minecart));
-        return !list.isEmpty();
+        Collection<Entity> list = p.getWorld().getNearbyEntities(new Location(p.getWorld(), x, y - 0.15, z), 0.4, 0.2, 0.4);
+        for (Entity e : list) {
+            if (e != p && (e instanceof Boat || e instanceof Shulker || e instanceof Minecart)) return true;
+        }
+        return false;
     }
 
     /** Hareket kontrollerinin "zeminde duruyor" bilgisi (sunucu hesabı). */
@@ -83,11 +82,11 @@ final class Probe {
                 for (int by = floor(minY); by <= floor(maxY - EPS); by++) {
                     Block b = w.getBlockAt(bx, by, bz);
                     Material m = b.getType();
-                    if (m.isAir() || b.isPassable()) continue;
-                    for (BoundingBox bb : b.getCollisionShape().getBoundingBoxes()) {
-                        if (bx + bb.getMinX() < maxX && bx + bb.getMaxX() > minX
-                                && by + bb.getMinY() < maxY && by + bb.getMaxY() > minY
-                                && bz + bb.getMinZ() < maxZ && bz + bb.getMaxZ() > minZ) return true;
+                    if (Compat.isAir(m) || b.isPassable()) continue;
+                    for (double[] bb : Compat.collisionBoxes(b)) {
+                        if (bx + bb[0] < maxX && bx + bb[3] > minX
+                                && by + bb[1] < maxY && by + bb[4] > minY
+                                && bz + bb[2] < maxZ && bz + bb[5] > minZ) return true;
                     }
                 }
             }
@@ -103,8 +102,7 @@ final class Probe {
                     int bx = floor(x) + dx, bz = floor(z) + dz;
                     if (!w.isChunkLoaded(bx >> 4, bz >> 4)) return true;
                     Material m = w.getBlockAt(bx, floor(y) + dy, bz).getType();
-                    if (m == Material.MOVING_PISTON || m == Material.PISTON_HEAD || m == Material.PISTON
-                            || m == Material.STICKY_PISTON) return true;
+                    if (Compat.isPistonPart(m)) return true;
                 }
         return false;
     }
@@ -115,25 +113,23 @@ final class Probe {
      */
     static boolean special(Player p, PlayerData d, double x, double y, double z, long tick) {
         World w = p.getWorld();
-        if (p.isInWater() || p.isInLava() || p.isSwimming()) d.liquidUntilTick = tick + 12;
+        if (Compat.inWater(p) || Compat.inLava(p) || p.isSwimming()) d.liquidUntilTick = tick + 12;
         Block feet = w.getBlockAt(floor(x), floor(y), floor(z));
         Block head = w.getBlockAt(floor(x), floor(y + 1.0), floor(z));
         Block below = w.getBlockAt(floor(x), floor(y - 0.2), floor(z));
         Material f = feet.getType(), h = head.getType(), b = below.getType();
 
-        if (Tag.CLIMBABLE.isTagged(f) || Tag.CLIMBABLE.isTagged(h) || Tag.CLIMBABLE.isTagged(b)) d.climbUntilTick = tick + 8;
-        if (f == Material.COBWEB || h == Material.COBWEB || f == Material.SWEET_BERRY_BUSH || h == Material.SWEET_BERRY_BUSH
-                || f == Material.POWDER_SNOW || h == Material.POWDER_SNOW || f == Material.BUBBLE_COLUMN || b == Material.BUBBLE_COLUMN
-                || f == Material.HONEY_BLOCK || b == Material.HONEY_BLOCK) d.climbUntilTick = Math.max(d.climbUntilTick, tick + 12);
-        if (b == Material.SLIME_BLOCK || b == Material.HONEY_BLOCK || Tag.BEDS.isTagged(b)) d.bounceUntilTick = tick + 30;
-        if (f == Material.MOVING_PISTON || f == Material.PISTON_HEAD || b == Material.MOVING_PISTON || b == Material.PISTON_HEAD
-                || h == Material.MOVING_PISTON || h == Material.PISTON_HEAD) d.pistonUntilTick = tick + 15;
+        if (Compat.isClimbable(f) || Compat.isClimbable(h) || Compat.isClimbable(b)) d.climbUntilTick = tick + 8;
+        if (Compat.isSlowingBlock(f) || Compat.isSlowingBlock(h) || Compat.isSlowingBlock(b))
+            d.climbUntilTick = Math.max(d.climbUntilTick, tick + 12);
+        if (Compat.isBouncy(b)) d.bounceUntilTick = tick + 30;
+        if (Compat.isPistonMoving(f) || Compat.isPistonMoving(b) || Compat.isPistonMoving(h)) d.pistonUntilTick = tick + 15;
         return tick < d.liquidUntilTick || tick < d.climbUntilTick || tick < d.bounceUntilTick || tick < d.pistonUntilTick;
     }
 
     static boolean ice(PlayerData d, World w, double x, double y, double z, long tick) {
         Material m = w.getBlockAt(floor(x), floor(y - 0.5), floor(z)).getType();
-        if (m == Material.ICE || m == Material.PACKED_ICE || m == Material.BLUE_ICE || m == Material.FROSTED_ICE)
+        if (Compat.isIce(m))
             d.iceUntilTick = tick + 25;
         return tick < d.iceUntilTick;
     }
@@ -153,7 +149,7 @@ final class Probe {
             if (!w.isChunkLoaded(bx >> 4, bz >> 4)) return false;
             for (double yo : new double[]{0.5, 1.4}) {
                 Block b = w.getBlockAt(bx, floor(y + yo), bz);
-                if (!b.getType().isAir() && !b.isPassable()) return true;
+                if (!Compat.isAir(b.getType()) && !b.isPassable()) return true;
             }
         }
         return false;
@@ -166,29 +162,28 @@ final class Probe {
         if (h.lengthSquared() > 0.04) {
             h.normalize();
             for (double yo : new double[]{0.1, 0.9, 1.6}) {
-                var rr = w.rayTraceBlocks(p.getLocation().add(0, yo, 0), h, 1.2, org.bukkit.FluidCollisionMode.NEVER, true);
+                RayTraceResult rr = w.rayTraceBlocks(p.getLocation().add(0, yo, 0), h, 1.2, org.bukkit.FluidCollisionMode.NEVER, true);
                 if (rr != null) return true;
             }
         }
         if (v.getY() > 0.1) {
-            var rr = w.rayTraceBlocks(p.getLocation().add(0, 1.8, 0), new Vector(0, 1, 0), 0.8, org.bukkit.FluidCollisionMode.NEVER, true);
+            RayTraceResult rr = w.rayTraceBlocks(p.getLocation().add(0, 1.8, 0), new Vector(0, 1, 0), 0.8, org.bukkit.FluidCollisionMode.NEVER, true);
             if (rr != null) return true;
         }
         return false;
     }
 
-    // -------- öznitelik / efekt yardımcıları (sürümler arası anahtar adı farkı için kayıt defteriyle) --------
+    // -------- öznitelik / efekt yardımcıları (sürümler arası ad farkları Compat'ta çözülür) --------
 
-    private static Attribute attr(String... keys) {
-        for (String k : keys) {
-            Attribute a = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(k));
-            if (a != null) return a;
-        }
-        return null;
-    }
+    private static final Attribute MOVE = Compat.attribute("GENERIC_MOVEMENT_SPEED", "MOVEMENT_SPEED");
+    private static final Attribute REACH = Compat.attribute("PLAYER_ENTITY_INTERACTION_RANGE", "ENTITY_INTERACTION_RANGE");
+    private static final PotionEffectType SPEED = Compat.effect("SPEED");
+    private static final PotionEffectType SLOWNESS = Compat.effect("SLOWNESS", "SLOW");
+    private static final PotionEffectType JUMP = Compat.effect("JUMP_BOOST", "JUMP");
+    private static final PotionEffectType LEVITATION = Compat.effect("LEVITATION");
+    private static final PotionEffectType SLOW_FALLING = Compat.effect("SLOW_FALLING");
 
-    private static final Attribute MOVE = attr("movement_speed", "generic.movement_speed");
-    private static final Attribute REACH = attr("entity_interaction_range", "player.entity_interaction_range");
+    private static PotionEffect effectOf(Player p, PotionEffectType t) { return t == null ? null : p.getPotionEffect(t); }
 
     /** Saldırı menzili (varsayılan 3.0). */
     static double entityReach(Player p) {
@@ -208,19 +203,19 @@ final class Probe {
             }
         }
         double mul = p.getWalkSpeed() / 0.2;
-        PotionEffect sp = p.getPotionEffect(PotionEffectType.SPEED);
+        PotionEffect sp = effectOf(p, SPEED);
         if (sp != null) mul *= 1 + 0.2 * (sp.getAmplifier() + 1);
-        PotionEffect sl = p.getPotionEffect(PotionEffectType.SLOWNESS);
+        PotionEffect sl = effectOf(p, SLOWNESS);
         if (sl != null) mul *= Math.max(0.1, 1 - 0.15 * (sl.getAmplifier() + 1));
         return Math.max(0.5, mul);
     }
 
     static int jumpLevel(Player p) {
-        PotionEffect e = p.getPotionEffect(PotionEffectType.JUMP_BOOST);
+        PotionEffect e = effectOf(p, JUMP);
         return e == null ? 0 : e.getAmplifier() + 1;
     }
 
     static boolean gravityAltered(Player p) {
-        return p.hasPotionEffect(PotionEffectType.LEVITATION) || p.hasPotionEffect(PotionEffectType.SLOW_FALLING);
+        return (LEVITATION != null && p.hasPotionEffect(LEVITATION)) || (SLOW_FALLING != null && p.hasPotionEffect(SLOW_FALLING));
     }
 }

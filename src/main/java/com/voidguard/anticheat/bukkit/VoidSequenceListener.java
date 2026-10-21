@@ -25,7 +25,10 @@ final class VoidSequenceListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onMove(PlayerMoveEvent e) {
-        if (frozen(e.getPlayer()) && e.hasChangedPosition()) e.setCancelled(true);   // bakış serbest, konum kilitli
+        if (!frozen(e.getPlayer())) return;
+        org.bukkit.Location f = e.getFrom(), t = e.getTo();
+        if (t != null && (f.getX() != t.getX() || f.getY() != t.getY() || f.getZ() != t.getZ()))
+            e.setCancelled(true);                                                   // bakış serbest, konum kilitli
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -44,7 +47,7 @@ final class VoidSequenceListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onAttack(EntityDamageByEntityEvent e) {
-        if (e.getDamager() instanceof Player p && frozen(p)) e.setCancelled(true);
+        if (e.getDamager() instanceof Player && frozen((Player) e.getDamager())) e.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.LOWEST)

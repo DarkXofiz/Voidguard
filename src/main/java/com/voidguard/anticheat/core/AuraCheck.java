@@ -6,7 +6,16 @@ import java.util.Set;
 
 /** KillAura davranış kontrolleri: çoklu hedef + vuruştan hemen önce aşırı keskin rotasyon. */
 public final class AuraCheck {
-    private record Hit(long tick, int targetId) {}
+    private static final class Hit {
+        private final long tick;
+        private final int targetId;
+        public Hit(long tick, int targetId) {
+            this.tick = tick;
+            this.targetId = targetId;
+        }
+        public long tick() { return tick; }
+        public int targetId() { return targetId; }
+    }
 
     private final ArrayDeque<Hit> hits = new ArrayDeque<>();
     private final ArrayDeque<Boolean> flickWindow = new ArrayDeque<>();

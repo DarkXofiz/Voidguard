@@ -16,9 +16,59 @@ package com.voidguard.anticheat.core;
  * @param usingItem    yemek/yay/kalkan kullanıyor
  * @param serverFall   sunucunun tuttuğu fallDistance
  */
-public record MoveSample(long tick, double dx, double dy, double dz, float yaw, float pitch,
-                         boolean clientGround, boolean standing, boolean exempt, boolean velocity, boolean special,
-                         boolean gravityOff, boolean ice, double speedMul, int jumpLevel,
-                         boolean usingItem, double serverFall) {
+public final class MoveSample {
+    private final long tick;
+    private final double dx;
+    private final double dy;
+    private final double dz;
+    private final float yaw;
+    private final float pitch;
+    private final boolean clientGround;
+    private final boolean standing;
+    private final boolean exempt;
+    private final boolean velocity;
+    private final boolean special;
+    private final boolean gravityOff;
+    private final boolean ice;
+    private final double speedMul;
+    private final int jumpLevel;
+    private final boolean usingItem;
+    private final double serverFall;
+    public MoveSample(long tick, double dx, double dy, double dz, float yaw, float pitch, boolean clientGround, boolean standing, boolean exempt, boolean velocity, boolean special, boolean gravityOff, boolean ice, double speedMul, int jumpLevel, boolean usingItem, double serverFall) {
+        this.tick = tick;
+        this.dx = dx;
+        this.dy = dy;
+        this.dz = dz;
+        this.yaw = yaw;
+        this.pitch = pitch;
+        this.clientGround = clientGround;
+        this.standing = standing;
+        this.exempt = exempt;
+        this.velocity = velocity;
+        this.special = special;
+        this.gravityOff = gravityOff;
+        this.ice = ice;
+        this.speedMul = speedMul;
+        this.jumpLevel = jumpLevel;
+        this.usingItem = usingItem;
+        this.serverFall = serverFall;
+    }
+    public long tick() { return tick; }
+    public double dx() { return dx; }
+    public double dy() { return dy; }
+    public double dz() { return dz; }
+    public float yaw() { return yaw; }
+    public float pitch() { return pitch; }
+    public boolean clientGround() { return clientGround; }
+    public boolean standing() { return standing; }
+    public boolean exempt() { return exempt; }
+    public boolean velocity() { return velocity; }
+    public boolean special() { return special; }
+    public boolean gravityOff() { return gravityOff; }
+    public boolean ice() { return ice; }
+    public double speedMul() { return speedMul; }
+    public int jumpLevel() { return jumpLevel; }
+    public boolean usingItem() { return usingItem; }
+    public double serverFall() { return serverFall; }
     public double hSpeed() { return Math.hypot(dx, dz); }
 }

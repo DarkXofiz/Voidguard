@@ -1,10 +1,10 @@
 # VoidGuard
 
-Paper **1.21+** için kanıt tabanlı, düşük yanlış-pozitifli AntiCheat. Bukkit/Paper API kullanır (NMS yok),
-bu yüzden 1.21.x sürümleri arasında yeniden derleme gerektirmesi beklenmez.
+**Paper/Spigot 1.13 – 1.21.x** için kanıt tabanlı, düşük yanlış-pozitifli AntiCheat (Java 8+ ile çalışır). 1.13 API'sine karşı derlenir,
+NMS kullanmaz; sonradan eklenen/yeniden adlandırılan API'ler (`Compat` sınıfı) yansıma ile çağrılır, bu yüzden tek jar tüm sürümlerde yüklenir.
 
 ## Derleme
-Yerelde (Java 21 gerekir; Gradle ayrıca kurmanız gerekmez, `gradlew` 8.10'u kendisi indirir):
+Yerelde (derleme için JDK 21 önerilir, çıktı Java 8 bayt kodudur; Gradle ayrıca kurmanız gerekmez, `gradlew` 8.10'u kendisi indirir):
 ```
 ./gradlew build         # build/libs/VoidGuard-1.0.0.jar  (+ 96 çekirdek test)
 ./gradlew coreTests     # yalnızca tespit mantığı testleri

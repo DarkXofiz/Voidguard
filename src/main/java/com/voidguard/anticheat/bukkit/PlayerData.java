@@ -52,6 +52,10 @@ public final class PlayerData {
     private double yaw1, yaw2;          // işaretli son iki yaw farkı
 
     public final Map<String, Long> lastAlertMs = new HashMap<>();
+    /** Yetkililere giden "gerçek" log zamanları (ban sayacı: yalnızca ban-uygun hileler) ve hepsi (saldırı engeli için). */
+    public final java.util.ArrayDeque<Long> logBan = new java.util.ArrayDeque<>();
+    public final java.util.ArrayDeque<Long> logAll = new java.util.ArrayDeque<>();
+    public long lastLogMs;
 
     /** Aktif geçici müdahaleler: tür (ATTACK/MOVE/PLACE/CONTAINER) -> bitiş (duvar saati ms). */
     public final Map<String, Long> mitUntil = new HashMap<>();

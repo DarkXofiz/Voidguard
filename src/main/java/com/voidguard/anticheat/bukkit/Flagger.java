@@ -31,6 +31,7 @@ final class Flagger {
 
         record("EVIDENCE", p, d, check, "[" + lvl + "] " + r.detail(), w, pts, total, now);
         alert(p, d, check, r.detail(), pts, now);
+        if (d.voidSeq) return;                                  // 3. log: ban sahnesi başladı
         instant(p, d, check, pts, now);                        // log düştüğü anda hileye özel anında engel
         if (lvl == SanctionPolicy.Level.LOW) return;          // düşük güven: ihlal sayılmaz (yalnızca kayıt + kısa engel)
 
@@ -78,25 +79,75 @@ final class Flagger {
         record(type, p, d, check, detail, 0, d.suspicion.points(check, now), d.suspicion.total(now), now);
     }
 
+    private static void prune(java.util.ArrayDeque<Long> q, long cutoff) {
+        while (!q.isEmpty() && q.peekFirst() < cutoff) q.pollFirst();
+    }
+
+    /**
+     * Staff logu. "Gerçek" log = kontrol puanı eşiği aştı. Gerçek loglar sayılır:
+     *  - 2. gerçek logda saldırılar 30 sn engellenir,
+     *  - ban-uygun hilelerin 3. logunda oyuncu donar, kararır, 5 blok yükselir ve banlanır.
+     * Yalnızca ban-uygun kontroller ve yalnızca puan eşiğini aşan loglar ban sayacına girer (yanlış pozitif koruması).
+     */
     private void alert(Player p, PlayerData d, String check, String detail, double pts, long now) {
         VoidGuardConfig c = plugin.cfg();
         boolean opsAll = c.b("alerts.notify-ops", true) && c.b("alerts.ops-see-all-evidence", true);
         double threshold = c.d("suspicion.alert-points-per-check", 4);
-        if (pts < threshold && !opsAll) return;
+        boolean real = pts >= threshold;
+        if (!real && !opsAll) return;
         Long last = d.lastAlertMs.get(check);
         if (last != null && now - last < c.i("suspicion.alert-cooldown-seconds", 3) * 1000L) return;
         d.lastAlertMs.put(check, now);
-        String msg = ChatColor.translateAlternateColorCodes('&', String.format(Locale.ROOT,
-                "&4[&cVoidGuard&4] &c%s &4» &c%s &4(&c%.1f&4) &c%s", p.getName(), check, pts, detail));
+
+        boolean lb = c.b("sanctions.log-ban.enabled", true);
+        int need = Math.max(1, c.i("sanctions.log-ban.logs-required", 3));
+        boolean counted = false, eligible = c.rule(check).banEligible();
+        if (real && lb && !d.voidSeq) {
+            long window = c.i("sanctions.log-ban.window-seconds", 180) * 1000L;
+            long gap = c.i("sanctions.log-ban.min-gap-seconds", 3) * 1000L;
+            prune(d.logAll, now - window);
+            prune(d.logBan, now - window);
+            if (now - d.lastLogMs >= gap) {
+                counted = true;
+                d.lastLogMs = now;
+                d.logAll.addLast(now);
+                if (eligible) d.logBan.addLast(now);
+            }
+        }
+
+        StringBuilder sb = new StringBuilder("&4&l⚠ &c&lVOIDGUARD &8» &f").append(p.getName())
+                .append(" &8| &c").append(check)
+                .append(String.format(Locale.ROOT, " &8(&c%.1f &7puan&8)", pts));
+        if (real && lb && eligible) sb.append(" &8| &cLOG &4").append(Math.min(d.logBan.size(), need)).append("&8/&4").append(need);
+        sb.append(" &8| &7").append(detail);
+        sb.append(" &8| &7ping &f").append(Compat.ping(p));
+        String msg = ChatColor.translateAlternateColorCodes('&', sb.toString());
         for (Player s : Bukkit.getOnlinePlayers()) {
             if (!plugin.alertsEnabled(s.getUniqueId())) continue;
             boolean op = c.b("alerts.notify-ops", true) && s.isOp();
             boolean staff = s.hasPermission("voidguard.alerts");
             if (op && opsAll) s.sendMessage(msg);
-            else if ((staff || op) && pts >= threshold) s.sendMessage(msg);
+            else if ((staff || op) && real) s.sendMessage(msg);
         }
         if (c.b("logging.console", false) && d.suspicion.total(now) >= c.d("logging.console-min-total", 8))
             plugin.getLogger().info(p.getName() + " " + check + " (" + String.format(Locale.ROOT, "%.1f", pts) + ") " + detail);
+
+        if (!counted) return;
+        // Çok log düştü: saldırılar belirli süre engellenir
+        int blockAt = c.i("sanctions.log-ban.attack-block-at", 2);
+        if (c.b("sanctions.mitigation-enabled", true) && d.logAll.size() >= blockAt) {
+            long secs = c.i("sanctions.log-ban.attack-block-seconds", 30);
+            boolean first = !d.mitActive("ATTACK", now);
+            d.mitUntil.merge("ATTACK", now + secs * 1000L, Math::max);
+            if (first) p.sendMessage("§c§lVoidGuard §8» §cŞüpheli davranışların yetkililere bildirildi. §7Vuruşların §c" + secs
+                    + " saniye §7engellendi.");
+        }
+        // Ban sayacı doldu
+        if (eligible && d.logBan.size() >= need) {
+            d.logBan.clear();
+            d.logAll.clear();
+            plugin.sanctions().logBan(p, d, check, now);
+        }
     }
 
     private void record(String type, Player p, PlayerData d, String check, String detail,

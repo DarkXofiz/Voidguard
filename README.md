@@ -39,6 +39,14 @@ Windows'tan yüklerseniz `gradlew` çalıştırma biti kaybolabilir; workflow `c
 etrafında kırmızı partikül çemberi döner, yukarı doğru havalanır ve tepede ban ekranıyla atılır. Ban sahne başlamadan
 kaydedilir, sahne sırasında çıkan oyuncu yine banlıdır. Ayar: `sanctions.void-sequence.*` (kapatılırsa anında atılır).
 
+**Log kuralları (en önemlisi):**
+- Yetkililere giden "gerçek" log = bir kontrolün puanı eşiği aştı. Satır biçimi: `⚠ VOIDGUARD » oyuncu | Kontrol (puan) | LOG 2/3 | detay | ping`.
+- **2. gerçek log:** oyuncunun vuruşları **30 sn** engellenir.
+- **3. log (ban-uygun hile):** oyuncu birden **donar**, etraf **kararır**, **5 blok yükselir** ve **30 gün ban** yer.
+- Hile açmayanlar için koruma: yalnızca ban-uygun kontroller sayılır, loglar arası en az 3 sn olmalı, sayaç 180 sn sonra sıfırlanır, lag/muafiyette kanıt üretilmez.
+- Fly/Step/HighJump (dikey fizik) TPS düşüşünde kapanmaz; sürekli havada kalma ayrıca yakalanır.
+- Ayarlar: `sanctions.log-ban.*`, `sanctions.void-sequence.*`, `sanctions.ban-duration-days`.
+
 Ban eklentinin kendi UUID tabanlı listesindedir (sunucu ban listesine bağımlı değil, sürümden bağımsız): oyuncu giriş yapamaz,
 kalan süre gösterilir, sunucu yeniden başlasa da sürer. Kaldırmak için `/vg unban <oyuncu>`. Süre ve açma/kapama: `sanctions.ban-*`.
 AutoClicker, Criticals, ChestStealer, GuiMove, Velocity, Rotation, AimAssist **ban-uygun değildir** (en fazla geçici kısıt).

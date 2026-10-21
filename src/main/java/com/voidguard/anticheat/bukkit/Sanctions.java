@@ -51,15 +51,7 @@ final class Sanctions {
                 return;
             case BAN:
                 if (c.banActive()) {
-                    long until = nowWall + (long) (c.d("sanctions.ban-duration-days", 7) * 86_400_000L);
-                    // Ban önce deftere yazılır: sahne sürerken çıkıp girerek kaçılamaz.
-                    plugin.ledger().setBan(p.getUniqueId(), p.getName(), until, check);
-                    plugin.saveLedger(false);
-                    plugin.flagger().recordEvent("BAN", p, d, check, "n=" + n + " until=" + until, nowWall);
-                    d.suspicion.clear();
-                    int need = rule.violationsToBan();
-                    if (c.b("sanctions.void-sequence.enabled", true)) plugin.voidSequence().start(p, d, until, need);
-                    else kickBanned(p, until, need);
+                    banNow(p, d, check, "n=" + n, nowWall);
                 } else {
                     plugin.flagger().recordEvent("WOULD_BAN", p, d, check, "n=" + n, nowWall);
                     if (canMitigate) {
@@ -74,11 +66,42 @@ final class Sanctions {
         }
     }
 
+    /** 3. log: ban açıksa donma + kararma + yükselme sahnesi ve ban; kapalıysa yalnızca bildirim. */
+    void logBan(Player p, PlayerData d, String check, long nowWall) {
+        VoidGuardConfig c = plugin.cfg();
+        int need = Math.max(1, c.i("sanctions.log-ban.logs-required", 3));
+        if (c.banActive()) {
+            banNow(p, d, check, need + " log", nowWall);
+        } else {
+            plugin.flagger().recordEvent("WOULD_BAN", p, d, check, need + " log", nowWall);
+            notifyWouldBan(p, d, check, need, nowWall);
+        }
+    }
+
+    /** Ban deftere ÖNCE yazılır (sahne sürerken çıkıp girerek kaçılamaz), sonra sahne başlar. */
+    void banNow(Player p, PlayerData d, String check, String why, long nowWall) {
+        VoidGuardConfig c = plugin.cfg();
+        long until = nowWall + (long) (c.d("sanctions.ban-duration-days", 30) * 86_400_000L);
+        plugin.ledger().setBan(p.getUniqueId(), p.getName(), until, check);
+        plugin.saveLedger(false);
+        plugin.flagger().recordEvent("BAN", p, d, check, why + " until=" + until, nowWall);
+        d.suspicion.clear();
+        d.logAll.clear();
+        d.logBan.clear();
+        int days = (int) Math.round(c.d("sanctions.ban-duration-days", 30));
+        String note = "§4§l⛔ §c§lVOIDGUARD §8» §f" + p.getName() + " §7(§c" + check + "§7) §c" + why
+                + " §8→ §4BAN §7(" + days + " gün). Sahne başladı.";
+        for (Player s : Bukkit.getOnlinePlayers()) {
+            if (!plugin.alertsEnabled(s.getUniqueId())) continue;
+            if (s.hasPermission("voidguard.alerts") || (c.b("alerts.notify-ops", true) && s.isOp())) s.sendMessage(note);
+        }
+        if (c.b("sanctions.void-sequence.enabled", true)) plugin.voidSequence().start(p, d, until, 0);
+        else kickBanned(p, until, 0);
+    }
+
     /** Ban ekranıyla oyuncuyu atar (sahne bitince veya sahne kapalıysa hemen). */
     void kickBanned(Player p, long until, int need) {
-        String counter = "§7(" + need + "/" + need + ")";
-        p.kickPlayer("§c§lVoidGuard §8» §cBirden fazla hile ihlali tespit edildi. Sunucudan yasaklandın. "
-                + counter + "\n" + remaining(until, System.currentTimeMillis()));
+        p.kickPlayer(banScreen(until, System.currentTimeMillis()));
     }
 
     /** Giriş engeli ve kick mesajı için kalan süre. */
@@ -88,14 +111,14 @@ final class Sanctions {
     }
 
     static String banScreen(long untilMs, long nowMs) {
-        return "§c§lVoidGuard §8» §cHile kullanımı nedeniyle sunucudan yasaklandın.\n" + remaining(untilMs, nowMs);
+        return "§4§l⚠ VOIDGUARD ⚠\n\n§cHile kullanımı tespit edildi.\n§cSunucudan yasaklandın.\n\n" + remaining(untilMs, nowMs);
     }
 
     private void notifyWouldBan(Player p, PlayerData d, String check, int n, long now) {
         VoidGuardConfig c = plugin.cfg();
         if (!c.b("alerts.notify-when-not-punished", true)) return;
         String msg = String.format(Locale.ROOT,
-                "§4[§cVoidGuard§4] §c⚠ §c%s §7için ban koşulları oluştu (§c%s§7, %d. ihlal) ama ban KAPALI olduğu için §aatılmadı§7. §8/vg status %s",
+                "§4[§cVoidGuard§4] §c⚠ §c%s §7için ban koşulları oluştu (§c%s§7, %d log) ama ban KAPALI olduğu için §aatılmadı§7. §8/vg status %s",
                 p.getName(), check, n, p.getName());
         for (Player s : Bukkit.getOnlinePlayers()) {
             if (!plugin.alertsEnabled(s.getUniqueId())) continue;

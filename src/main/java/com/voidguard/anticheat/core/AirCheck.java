@@ -8,13 +8,16 @@ public final class AirCheck {
     public static final double STEP_LIMIT = 0.62;
     private static final double UP_TOLERANCE = 0.03;
     private static final double DOWN_TOLERANCE = 0.12;
+    /** Sürekli havada kalma: vanilla'da 30 tik havada kalan oyuncu apeksten onlarca blok düşmüş olur. */
+    private static final int AIR_LIMIT = 30;
+    private static final double AIR_MIN_DROP = 3.0;
 
     private boolean prevGround = true;
     private double lastDy;
     private int airTicks, skip, hover;
-    private double rise;
+    private double rise, net;
 
-    private final FlagBuffer flyBuf = new FlagBuffer(4, 0.5);
+    private final FlagBuffer flyBuf = new FlagBuffer(3, 0.5);
     private final FlagBuffer fallBuf = new FlagBuffer(4, 0.5);
     private final FlagBuffer stepBuf = new FlagBuffer(2, 0.5);
     private final int hoverTicks;
@@ -30,7 +33,7 @@ public final class AirCheck {
     private void resetState(MoveSample s) {
         prevGround = s.standing();
         lastDy = s.dy();
-        airTicks = 0; hover = 0; rise = 0;
+        airTicks = 0; hover = 0; rise = 0; net = 0;
         skip = 3;
         flyBuf.reset(); fallBuf.reset();
     }
@@ -55,16 +58,18 @@ public final class AirCheck {
             } else {
                 stepBuf.pass();
             }
-            airTicks = 0; rise = 0; hover = 0;
+            airTicks = 0; rise = 0; hover = 0; net = 0;
         } else if (prevGround) {
             // Kalkış tiki
             double max = 0.42 + 0.1 * s.jumpLevel() + 0.06;
             if (s.dy() > max) r = Result.of(1.0, "HighJump takeoff dy=" + fmt(s.dy()) + " max=" + fmt(max));
             airTicks = 0;
             rise = Math.max(0, s.dy());
+            net = s.dy();
             hover = 0;
         } else {
             airTicks++;
+            net += s.dy();
             double predicted = (lastDy - 0.08) * 0.98;
             double diff = s.dy() - predicted;
             if (diff > UP_TOLERANCE) {
@@ -79,6 +84,10 @@ public final class AirCheck {
             if (r == null && hover >= hoverTicks) {
                 r = Result.of(1.0, "Hover " + hover + " tik havada sabit");
                 hover = 0;
+            }
+            if (r == null && airTicks >= AIR_LIMIT && net > -AIR_MIN_DROP) {
+                r = Result.of(1.0, "Fly sürekli havada " + airTicks + " tik, net dy=" + fmt(net));
+                airTicks = AIR_LIMIT - 10;       // uçmaya devam ederse 10 tikte bir tekrar
             }
             if (r == null && s.jumpLevel() == 0 && rise > maxRise) {
                 r = Result.of(1.0, "HighJump yükselme=" + fmt(rise) + " max=" + fmt(maxRise));

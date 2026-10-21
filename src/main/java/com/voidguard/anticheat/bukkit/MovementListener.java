@@ -97,7 +97,27 @@ final class MovementListener implements Listener {
                 MoveSample s = new MoveSample(tick, dx, dy, dz, yaw, pitch, p.isOnGround(), p.isOnGround(), true, false, false,
                         false, false, 1.0, 0, false, p.getFallDistance());
                 standing = p.isOnGround();
-                d.air.onMove(s); d.speed.onMove(s); d.noFall.onMove(s, () -> true); d.noSlow.onMove(s);
+                // Dikey fizik (Fly/Step/HighJump) TPS düşüşünden ETKİLENMEZ: yalnızca aşırı pingde atlanır.
+                boolean airOnly = !exempt && Compat.ping(p) <= cfg.i("safety.max-ping-ms-air", 1000);
+                if (airOnly) {
+                    final double ax = to.getX(), ay = to.getY(), az = to.getZ();
+                    boolean st = Probe.standing(p, ax, ay, az);
+                    boolean sp = Probe.special(p, d, ax, ay, az, tick);
+                    MoveSample as = new MoveSample(tick, dx, dy, dz, yaw, pitch, p.isOnGround(), st, false, tick < d.velocityUntilTick,
+                            sp, Probe.gravityAltered(p), false, Probe.speedMul(p), Probe.jumpLevel(p), p.isHandRaised(),
+                            p.getFallDistance());
+                    Result ar = d.air.onMove(as);
+                    if (ar != null) {
+                        String an = airName(ar);
+                        if (an.equals("Fly") && dy > 0 && ar.detail().startsWith("Fly") && Probe.nearWall(w, ax, ay, az)) an = "Spider";
+                        bad |= flag(p, d, an, ar);
+                    }
+                    standing = st;
+                    if (!bad && st && !sp) d.setGood(w, ax, ay, az, yaw, pitch);
+                } else {
+                    d.air.onMove(s);
+                }
+                d.speed.onMove(s); d.noFall.onMove(s, () -> true); d.noSlow.onMove(s);
                 d.jesus.onMove(false, 0, 0, true);
             } else {
                 final double tx = to.getX(), ty = to.getY(), tz = to.getZ();

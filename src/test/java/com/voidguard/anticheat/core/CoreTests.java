@@ -37,6 +37,7 @@ public class CoreTests {
     public static void main(String[] args) {
         legitMovement();
         cheatMovement();
+        flyAirtime();
         timer();
         velocity();
         combat();
@@ -46,6 +47,27 @@ public class CoreTests {
         policy();
         System.out.println("\n== " + passed + " geçti, " + failed + " başarısız ==");
         System.exit(failed == 0 ? 0 : 1);
+    }
+
+    /** Havada sabit hızla (veya sabit yükseklikte) uçan oyuncu mutlaka yakalanmalı; meşru uzun düşüş yakalanmamalı. */
+    static void flyAirtime() {
+        System.out.println("[Fly – sürekli havada]");
+        int hits = 0;
+        AirCheck air = new AirCheck();
+        for (int i = 0; i < 12; i++) air.onMove(ms(i, 0, 0, 0, true));
+        for (int i = 12; i < 80; i++) if (air.onMove(ms(i, 0.2, 0.0, 0, false)) != null) hits++;
+        check(hits >= 3, "sabit yükseklikte uçuş yakalanır (kanıt=" + hits + ")");
+
+        hits = 0; air = new AirCheck();
+        for (int i = 0; i < 12; i++) air.onMove(ms(i, 0, 0, 0, true));
+        for (int i = 12; i < 90; i++) if (air.onMove(ms(i, 0.2, -0.02, 0, false)) != null) hits++;
+        check(hits >= 3, "yavaş süzülen uçuş yakalanır (kanıt=" + hits + ")");
+
+        hits = 0; air = new AirCheck();
+        for (int i = 0; i < 12; i++) air.onMove(ms(i, 0, 0, 0, true));
+        double vy = 0;
+        for (int i = 12; i < 100; i++) { vy = (vy - 0.08) * 0.98; if (air.onMove(ms(i, 0.2, vy, 0, false)) != null) hits++; }
+        check(hits == 0, "meşru uzun düşüş kanıt üretmez (kanıt=" + hits + ")");
     }
 
     // ================= MEŞRU HAREKET =================

@@ -2,6 +2,7 @@ package com.voidguard.anticheat.bukkit;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Color;
@@ -9,6 +10,8 @@ import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
@@ -20,8 +23,11 @@ import org.bukkit.util.Vector;
  */
 final class VoidSequence {
     private static final Particle DUST = Compat.particle("REDSTONE", "DUST");     // 1.20.5'te DUST oldu
+    private static final Particle SMOKE = Compat.particle("LARGE_SMOKE", "SMOKE_LARGE");
     private static final Particle SPARK = Compat.particle("SOUL_FIRE_FLAME", "FLAME");
     private static final Particle.DustOptions RED = new Particle.DustOptions(Color.fromRGB(220, 0, 0), 1.5f);
+    private static final PotionEffectType BLIND = Compat.effect("BLINDNESS");
+    private static final PotionEffectType DARKNESS = Compat.effect("DARKNESS");   // 1.19+
     private static final Particle.DustOptions DARK_RED = new Particle.DustOptions(Color.fromRGB(120, 0, 0), 1.2f);
 
     private static final class Run {
@@ -31,6 +37,9 @@ final class VoidSequence {
         final long until;
         final int need, freeze, rise;
         final double height, radius;
+        int darkTick, darkRadius;
+        boolean darkened;
+        final List<UUID> darkPlayers = new ArrayList<UUID>();
         final float walkSpeed;
         final boolean gravity, invulnerable;
         BukkitTask task;
@@ -57,12 +66,14 @@ final class VoidSequence {
         UUID id = p.getUniqueId();
         if (runs.containsKey(id)) return;
         VoidGuardConfig c = plugin.cfg();
-        int freeze = Math.max(5, c.i("sanctions.void-sequence.freeze-ticks", 30));
-        int rise = Math.max(10, c.i("sanctions.void-sequence.rise-ticks", 50));
-        double height = Math.max(2.0, c.d("sanctions.void-sequence.rise-height", 14.0));
+        int freeze = Math.max(5, c.i("sanctions.void-sequence.freeze-ticks", 40));
+        int rise = Math.max(10, c.i("sanctions.void-sequence.rise-ticks", 40));
+        double height = Math.max(1.0, c.d("sanctions.void-sequence.rise-height", 5.0));
         double radius = Math.max(0.6, c.d("sanctions.void-sequence.ring-radius", 1.4));
 
         final Run r = new Run(p, d, until, need, freeze, rise, height, radius);
+        r.darkTick = c.b("sanctions.void-sequence.darken", true) ? Math.max(0, c.i("sanctions.void-sequence.darken-tick", 12)) : -1;
+        r.darkRadius = Math.max(0, c.i("sanctions.void-sequence.darken-radius", 20));
         runs.put(id, r);
         d.voidSeq = true;
         d.velocity.cancel();
@@ -77,7 +88,7 @@ final class VoidSequence {
 
         World w = p.getWorld();
         w.playSound(r.base, "block.beacon.activate", 1.2f, 0.7f);
-        p.sendTitle("§4§lVOIDGUARD", "§cHile tespit edildi", 5, 60, 10);
+        p.sendTitle("§4§l⚠ VOIDGUARD ⚠", "§cHile tespit edildi", 5, 70, 10);
         p.sendMessage("§c§lVoidGuard §8» §cHile kullanımı tespit edildi. Hareket edemezsin.");
 
         r.task = plugin.getServer().getScheduler().runTaskTimer(plugin, new Runnable() {
@@ -122,6 +133,9 @@ final class VoidSequence {
         p.setFallDistance(0f);
 
         rings(r, to, t);
+        if (r.darkTick >= 0 && t == r.darkTick) darken(r);
+        if (r.darkened && SMOKE != null && t % 2 == 0)
+            to.getWorld().spawnParticle(SMOKE, to.getX(), to.getY() + 1.0, to.getZ(), 6, 0.7, 0.6, 0.7, 0.01);
 
         if (t == r.freeze) {
             to.getWorld().playSound(to, "block.beacon.power_select", 1.2f, 0.6f);
@@ -156,6 +170,26 @@ final class VoidSequence {
             w.spawnParticle(SPARK, at.getX(), at.getY() + 0.05, at.getZ(), 4, 0.35, 0.05, 0.35, 0.01);
     }
 
+    /** Etraf kararır: oyuncu kör olur, gece gökyüzü/ışık yakındaki oyunculara da yansır (yalnızca istemci tarafı). */
+    private void darken(Run r) {
+        r.darkened = true;
+        Player p = r.player;
+        int remain = Math.max(20, (r.freeze + r.rise) - r.t + 40);
+        try {
+            if (BLIND != null) p.addPotionEffect(new PotionEffect(BLIND, remain, 0, false, false), true);
+            if (DARKNESS != null) p.addPotionEffect(new PotionEffect(DARKNESS, remain, 0, false, false), true);
+        } catch (Throwable ignored) { }
+        try {
+            double rr = (double) r.darkRadius * r.darkRadius;
+            for (Player o : p.getWorld().getPlayers()) {
+                if (o.getLocation().distanceSquared(r.base) > rr) continue;
+                o.setPlayerTime(18000L, false);                 // gece yarısı (yalnızca o oyuncunun istemcisi)
+                r.darkPlayers.add(o.getUniqueId());
+            }
+        } catch (Throwable ignored) { }
+        p.getWorld().playSound(r.base, "entity.wither.spawn", 0.6f, 0.6f);
+    }
+
     private void finish(Run r) {
         Player p = r.player;
         UUID id = p.getUniqueId();
@@ -176,6 +210,16 @@ final class VoidSequence {
         r.data.voidSeq = false;
         Player p = r.player;
         p.setWalkSpeed(r.walkSpeed);
+        if (r.darkened) {
+            try {
+                if (BLIND != null) p.removePotionEffect(BLIND);
+                if (DARKNESS != null) p.removePotionEffect(DARKNESS);
+            } catch (Throwable ignored) { }
+            for (UUID u : r.darkPlayers) {
+                Player o = plugin.getServer().getPlayer(u);
+                if (o != null) { try { o.resetPlayerTime(); } catch (Throwable ignored) { } }
+            }
+        }
         p.setGravity(r.gravity);
         p.setInvulnerable(r.invulnerable);
     }
